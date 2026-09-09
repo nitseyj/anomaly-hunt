@@ -1,0 +1,29 @@
+{
+  "levels": [
+    {
+      "level_id": "level_01",
+      "level_name": "Q1 Revenue Review",
+      "difficulty": "easy"
+    },
+    {
+      "level_id": "level_02",
+      "level_name": "Product Usage Audit",
+      "difficulty": "medium"
+    },
+    {
+      "level_id": "level_03",
+      "level_name": "Support Volume Check",
+      "difficulty": "medium"
+    },
+    {
+      "level_id": "level_04",
+      "level_name": "Manufacturing QA Log",
+      "difficulty": "hard"
+    },
+    {
+      "level_id": "level_05",
+      "level_name": "API Performance Incident",
+      "difficulty": "hard"
+    }
+  ]
+}
