@@ -83,10 +83,22 @@ export function evaluateDetector(flags, groundTruthAnomalies, tolerance = 3) {
     if (trueIdxs.has(idx)) tp += 1;
     else fp += 1;
   }
-  const fn = [...trueIdxs].filter((i) => !flaggedIdxs.includes(i)).length;
+
+  // Recall is computed per ANOMALY EVENT, not per index within the
+  // tolerance window: an anomaly counts as "found" if at least one flag
+  // landed within its tolerance window. This matters because detector
+  // algorithms often flag several contiguous points around a real
+  // anomaly, while a single click (human or otherwise) naturally flags
+  // just one point -- an index-level recall would structurally punish
+  // single-click input even when it correctly identifies every anomaly,
+  // which would make "Human vs Machine" an unfair comparison by
+  // construction rather than a genuine one.
+  const anomaliesFound = groundTruthAnomalies.filter((a) =>
+    flaggedIdxs.some((idx) => Math.abs(idx - a.index) <= tolerance)
+  ).length;
 
   const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
-  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+  const recall = groundTruthAnomalies.length > 0 ? anomaliesFound / groundTruthAnomalies.length : 0;
   const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
 
   return { precision: round3(precision), recall: round3(recall), f1: round3(f1) };

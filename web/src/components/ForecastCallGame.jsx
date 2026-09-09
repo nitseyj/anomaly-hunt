@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import ForecastChart from './ForecastChart.jsx';
-import { generateForecast, FORECAST_ROUND_COUNT } from '../game-logic/forecastGenerator.js';
-import { scoreForecast, FORECAST_FULL_CREDIT_PCT, FORECAST_ZERO_CREDIT_PCT } from '../game-logic/forecastScoring.js';
-import { formatValue } from '../game-logic/businessMetrics.js';
+import { generateForecast, FORECAST_ROUND_COUNT, FORECAST_HIDDEN_DAYS } from '../game-logic/forecastGenerator.js';
+import { scoreForecastAnswer, CONFIDENCE_LEVELS } from '../game-logic/forecastScoring.js';
 import { getScores, submitScore } from '../game-logic/leaderboard.js';
-import { recordGameResult } from '../game-logic/profile.js';
+import { recordGameResult, recordForecastCase } from '../game-logic/profile.js';
+import { addHistoryEntry } from '../game-logic/history.js';
 
 const MODE = 'forecast_call';
+const CONFIDENCE_LABELS = { low: 'Low', medium: 'Medium', high: 'High' };
 
-// Stages: 'briefing' -> 'guessing' -> 'result' -> (loop) -> 'gameover'
+// Stages: 'answering' -> 'result' -> (loop) -> 'gameover'
 export default function ForecastCallGame({ onExit }) {
-  const [stage, setStage] = useState('briefing');
+  const [stage, setStage] = useState('answering');
   const [roundIdx, setRoundIdx] = useState(0);
   const [round, setRound] = useState(() => generateForecast([]));
   const [usedTemplates, setUsedTemplates] = useState([round.templateId]);
-  const [guessInput, setGuessInput] = useState('');
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [confidence, setConfidence] = useState(null);
   const [result, setResult] = useState(null);
   const [totalPoints, setTotalPoints] = useState(0);
   const [scores, setScores] = useState(getScores(MODE));
@@ -24,23 +26,34 @@ export default function ForecastCallGame({ onExit }) {
     const next = generateForecast(priorUsedTemplates);
     setRound(next);
     setUsedTemplates([...priorUsedTemplates, next.templateId]);
-    setGuessInput('');
+    setSelectedOption(null);
+    setConfidence(null);
     setResult(null);
   }
 
-  function submitGuess() {
-    const guess = parseFloat(guessInput);
-    if (isNaN(guess)) return;
-    const scored = scoreForecast(guess, round.actualValue);
-    setResult({ guess, ...scored });
+  function submitAnswer() {
+    if (selectedOption === null || confidence === null) return;
+    const isCorrect = selectedOption === round.correctIndex;
+    const scored = scoreForecastAnswer(isCorrect, confidence);
+    setResult({ isCorrect, ...scored });
     setTotalPoints((prev) => prev + scored.points);
+    recordForecastCase(isCorrect);
+    addHistoryEntry({
+      mode: 'forecast_call',
+      metric: round.y_label,
+      questionType: round.questionType,
+      score: scored.points,
+      isCorrect,
+    });
     setRoundHistory((prev) => [
       ...prev,
       {
         levelName: round.case_name,
-        guess,
-        actual: round.actualValue,
-        errorPct: scored.errorPct,
+        questionType: round.questionType,
+        yourAnswer: round.options[selectedOption],
+        actual: round.options[round.correctIndex],
+        isCorrect,
+        confidence,
         points: scored.points,
       },
     ]);
@@ -51,15 +64,15 @@ export default function ForecastCallGame({ onExit }) {
     if (roundIdx + 1 < FORECAST_ROUND_COUNT) {
       setRoundIdx((i) => i + 1);
       loadRound(usedTemplates);
-      setStage('briefing');
+      setStage('answering');
     } else {
-      recordGameResult(MODE, totalPoints);
+      recordGameResult(MODE, Math.max(0, totalPoints));
       setStage('gameover');
     }
   }
 
   function finishGame(playerName) {
-    const updated = submitScore(MODE, playerName, totalPoints, FORECAST_ROUND_COUNT);
+    const updated = submitScore(MODE, playerName, Math.max(0, totalPoints), FORECAST_ROUND_COUNT);
     setScores(updated);
   }
 
@@ -69,13 +82,13 @@ export default function ForecastCallGame({ onExit }) {
     setRoundHistory([]);
     setScores(getScores(MODE));
     loadRound([]);
-    setStage('briefing');
+    setStage('answering');
   }
 
   if (stage === 'gameover') {
     return (
       <GameOverScreen
-        totalPoints={totalPoints}
+        totalPoints={Math.max(0, totalPoints)}
         scores={scores}
         roundHistory={roundHistory}
         onSubmitName={finishGame}
@@ -92,7 +105,7 @@ export default function ForecastCallGame({ onExit }) {
           ← Anomaly Hunt
         </button>
         <span className="dd-progress">
-          Round {roundIdx + 1} of {FORECAST_ROUND_COUNT}
+          Case {roundIdx + 1} of {FORECAST_ROUND_COUNT}
           <span className="dd-pill dd-pill--info">forecast</span>
         </span>
       </div>
@@ -104,60 +117,39 @@ export default function ForecastCallGame({ onExit }) {
 
       <div className="dd-chart-panel">
         <ForecastChart
+          key={round.genId}
           visibleSeries={round.visibleSeries}
+          futureSeries={round.futureSeries}
           unit={round.unit}
           yLabel={round.y_label}
           targetDate={round.targetDate}
-          guessValue={result?.guess ?? null}
-          actualValue={stage === 'result' ? round.actualValue : null}
+          revealed={stage === 'result'}
         />
         <p className="dd-chart-caption">
-          {stage === 'briefing' || stage === 'guessing'
-            ? `What will ${round.y_label.toLowerCase()} be on ${round.targetDate}? Base your call on the trend above.`
-            : 'Blue dot = your call. Green star = what actually happened.'}
+          {stage === 'answering'
+            ? `Only history up to the cutoff is shown. Predict the next ${FORECAST_HIDDEN_DAYS} days from the trend above.`
+            : 'Dashed green line shows what actually happened after the cutoff.'}
         </p>
       </div>
 
-      {stage !== 'result' && (
-        <div className="dd-actions">
-          <input
-            type="number"
-            step="any"
-            placeholder={`Your prediction (${round.unit === 'usd' ? '$' : ''}${round.unit === 'percent' ? '%' : ''})`}
-            value={guessInput}
-            onChange={(e) => setGuessInput(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '9px 12px',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 6,
-              fontSize: 14,
-            }}
-          />
-          <button className="dd-btn dd-btn--primary" onClick={submitGuess} disabled={guessInput === ''}>
-            Lock in prediction
-          </button>
-        </div>
+      {stage === 'answering' && (
+        <McqPanel
+          round={round}
+          selectedOption={selectedOption}
+          onSelectOption={setSelectedOption}
+          confidence={confidence}
+          onSelectConfidence={setConfidence}
+          onSubmit={submitAnswer}
+        />
       )}
 
       {stage === 'result' && (
         <>
-          <div className="dd-result">
-            <h3>Forecast result</h3>
-            <p className="dd-result-line">
-              You called <strong>{formatValue(result.guess, round.unit)}</strong> · Actual was{' '}
-              <strong>{formatValue(round.actualValue, round.unit)}</strong> · Off by{' '}
-              <strong>{result.errorPct}%</strong> · <strong>{result.points} pts</strong>
-            </p>
-            <p className="dd-methodology-note">
-              Full credit within {FORECAST_FULL_CREDIT_PCT}% error, zero credit at {FORECAST_ZERO_CREDIT_PCT}%
-              or more — partial credit fades linearly in between.
-            </p>
-          </div>
+          <ForecastResult result={result} round={round} selectedOption={selectedOption} confidence={confidence} />
           <div className="dd-actions">
             <span />
             <button className="dd-btn dd-btn--primary" onClick={nextRound}>
-              {roundIdx + 1 < FORECAST_ROUND_COUNT ? 'Next round' : 'Finish forecasting'}
+              {roundIdx + 1 < FORECAST_ROUND_COUNT ? 'Next case' : 'Finish forecasting'}
             </button>
           </div>
         </>
@@ -166,12 +158,79 @@ export default function ForecastCallGame({ onExit }) {
   );
 }
 
+function McqPanel({ round, selectedOption, onSelectOption, confidence, onSelectConfidence, onSubmit }) {
+  const canSubmit = selectedOption !== null && confidence !== null;
+
+  return (
+    <div className="dd-mcq-panel">
+      <p className="dd-mcq-question">{round.question}</p>
+      <div className="dd-mcq-options">
+        {round.options.map((opt, i) => (
+          <button
+            key={i}
+            className={`dd-mcq-option ${selectedOption === i ? 'dd-mcq-option--selected' : ''}`}
+            onClick={() => onSelectOption(i)}
+          >
+            <span className="dd-mcq-option-letter">{String.fromCharCode(65 + i)}</span>
+            <span>{opt}</span>
+          </button>
+        ))}
+      </div>
+
+      <p className="dd-mcq-confidence-label">How confident are you?</p>
+      <div className="dd-confidence-row">
+        {CONFIDENCE_LEVELS.map((level) => (
+          <button
+            key={level}
+            className={`dd-confidence-btn ${confidence === level ? 'dd-confidence-btn--selected' : ''}`}
+            onClick={() => onSelectConfidence(level)}
+          >
+            {CONFIDENCE_LABELS[level]}
+          </button>
+        ))}
+      </div>
+
+      <div className="dd-actions">
+        <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
+          Higher confidence raises both the reward and the penalty.
+        </span>
+        <button className="dd-btn dd-btn--primary" onClick={onSubmit} disabled={!canSubmit}>
+          Lock in forecast
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ForecastResult({ result, round, selectedOption, confidence }) {
+  return (
+    <div className="dd-result">
+      <h3>{result.isCorrect ? 'Correct call' : 'Missed call'}</h3>
+      <p className="dd-result-line">
+        Your prediction <strong>{round.options[selectedOption]}</strong> · Actual{' '}
+        <strong>{round.options[round.correctIndex]}</strong>
+      </p>
+      <p className="dd-result-line">
+        Confidence <strong>{CONFIDENCE_LABELS[confidence]}</strong> ({result.multiplier}×) ·{' '}
+        <strong style={{ color: result.points >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+          {result.points >= 0 ? '+' : ''}
+          {result.points} pts
+        </strong>
+      </p>
+      <p className="dd-methodology-note">{round.explanation}</p>
+    </div>
+  );
+}
+
 function downloadCsv(roundHistory, totalPoints) {
-  const header = 'Round,Metric,Your Call,Actual,Error %,Points\n';
+  const header = 'Case,Question Type,Your Answer,Actual,Correct,Confidence,Points\n';
   const rows = roundHistory
-    .map((r, i) => `${i + 1},"${r.levelName}",${r.guess},${r.actual},${r.errorPct},${r.points}`)
+    .map(
+      (r, i) =>
+        `${i + 1},"${r.levelName}",${r.questionType},"${r.yourAnswer}","${r.actual}",${r.isCorrect},${r.confidence},${r.points}`
+    )
     .join('\n');
-  const footer = `\nTotal,,,,,${totalPoints}\n`;
+  const footer = `\nTotal,,,,,,${totalPoints}\n`;
   const csv = header + rows + footer;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -188,6 +247,7 @@ function downloadCsv(roundHistory, totalPoints) {
 function GameOverScreen({ totalPoints, scores, roundHistory, onSubmitName, onPlayAgain, onExit }) {
   const [name, setName] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const correctCount = roundHistory.filter((r) => r.isCorrect).length;
 
   return (
     <div className="dd-gameover">
@@ -196,10 +256,13 @@ function GameOverScreen({ totalPoints, scores, roundHistory, onSubmitName, onPla
       </button>
       <h1 style={{ marginTop: 16 }}>Forecasting complete</h1>
       <div className="dd-score">{totalPoints} pts</div>
+      <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: -16, marginBottom: 20 }}>
+        {correctCount} of {roundHistory.length} calls correct
+      </p>
 
       {!submitted ? (
         <div className="dd-name-input">
-          <input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="dd-input" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
           <button
             className="dd-btn dd-btn--primary"
             onClick={() => {
@@ -218,7 +281,7 @@ function GameOverScreen({ totalPoints, scores, roundHistory, onSubmitName, onPla
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
         <button className="dd-btn dd-btn--primary" onClick={onPlayAgain}>
-          New round
+          New forecast session
         </button>
         <button className="dd-btn" onClick={() => downloadCsv(roundHistory, totalPoints)}>
           Download report (CSV)
@@ -230,9 +293,12 @@ function GameOverScreen({ totalPoints, scores, roundHistory, onSubmitName, onPla
         {roundHistory.map((r, i) => (
           <li key={i}>
             <span>
-              {i + 1}. {r.levelName} — off by {r.errorPct}%
+              {i + 1}. {r.levelName} — {r.isCorrect ? 'correct' : 'incorrect'} ({r.confidence} confidence)
             </span>
-            <span>{r.points} pts</span>
+            <span>
+              {r.points >= 0 ? '+' : ''}
+              {r.points} pts
+            </span>
           </li>
         ))}
       </ul>

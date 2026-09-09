@@ -7,7 +7,7 @@
  * anomaly placement -- no two rounds look the same.
  */
 
-import { mulberry32, stdDev, clampToUnit, pickTemplate, SERIES_LENGTH } from './businessMetrics.js';
+import { mulberry32, stdDev, clampToUnit, pickTemplate, generateInstanceId, SERIES_LENGTH } from './businessMetrics.js';
 
 const ANOMALY_TYPES = ['point_spike', 'level_shift', 'missing_gap', 'trend_break'];
 
@@ -57,10 +57,24 @@ function injectAnomalies(values, difficulty, rng) {
     // subtler than "easy" consistently across every anomaly type.
     const magnitude = std * settings.magnitudeMult * (0.85 + rng() * 0.3);
 
+    // A downward level_shift/trend_break sized from the SERIES-WIDE std
+    // can easily exceed the LOCAL baseline near idx (especially late in a
+    // declining series), driving many consecutive days below a metric's
+    // floor (e.g. revenue can't go negative) -- once clamped, that shows
+    // up as a long flat run of identical zero-ish points, which reads as
+    // a rendering glitch rather than a real anomaly. Cap the downward
+    // delta at a fraction of the local mean so it stays dramatic without
+    // ever fully flattening a stretch of the series.
+    const localWindow = out.slice(Math.max(0, idx - 10), idx);
+    const localMean = localWindow.length > 0 ? localWindow.reduce((a, b) => a + b, 0) / localWindow.length : out[idx];
+    const maxDownwardDelta = Math.abs(localMean) * 0.85;
+
     if (type === 'point_spike') {
       out[idx] += direction * magnitude;
     } else if (type === 'level_shift') {
-      for (let i = idx; i < n; i++) out[i] += direction * magnitude;
+      const delta = direction * magnitude;
+      const cappedDelta = direction < 0 ? Math.max(delta, -maxDownwardDelta) : delta;
+      for (let i = idx; i < n; i++) out[i] += cappedDelta;
     } else if (type === 'missing_gap') {
       const gapLen = gapMin + Math.floor(rng() * (gapMax - gapMin + 1));
       const flatValue = out[Math.max(idx - 1, 0)];
@@ -76,11 +90,26 @@ function injectAnomalies(values, difficulty, rng) {
       const immediateStep = magnitude * 0.9;
       const slope = magnitude * 0.08;
       for (let i = idx; i < n; i++) {
-        out[i] += direction * (immediateStep + (i - idx) * slope);
+        const rawDelta = direction * (immediateStep + (i - idx) * slope);
+        const cappedDelta = direction < 0 ? Math.max(rawDelta, -maxDownwardDelta) : rawDelta;
+        out[i] += cappedDelta;
       }
     }
 
     groundTruth.push({ type, index: idx });
+  }
+
+  // Final safety net: per-anomaly capping (above) bounds each anomaly's
+  // own contribution, but level_shift/trend_break both extend to the end
+  // of the series -- any two of them will eventually have overlapping
+  // tails, and their capped-but-still-large deltas can still compound
+  // additively toward a shared floor. No point should end up more than
+  // ~85% below where it would have been with no anomaly at all, however
+  // many anomalies jointly touch it.
+  for (let i = 0; i < n; i++) {
+    if (values[i] > 0 && out[i] < values[i] * 0.15) {
+      out[i] = values[i] * 0.15;
+    }
   }
 
   return { values: out, groundTruth };
@@ -90,9 +119,14 @@ function injectAnomalies(values, difficulty, rng) {
  * Builds one fresh, randomized Anomaly Hunt round. Call this again any
  * time you want a brand new case — every call produces a different
  * template, different randomized parameters, and different anomalies.
+ *
+ * @param {number|null} seed - if provided, generation is fully
+ *   deterministic (same seed always produces the same case) -- this is
+ *   what the Daily Challenge uses to give every player the same case on
+ *   a given date. Omit it for normal random play.
  */
-export function generateCase(difficulty, usedTemplateIds = []) {
-  const rng = mulberry32(Math.floor(Math.random() * 2 ** 31));
+export function generateCase(difficulty, usedTemplateIds = [], seed = null) {
+  const rng = mulberry32(seed ?? Math.floor(Math.random() * 2 ** 31));
   const { template, scenario } = pickTemplate(rng, usedTemplateIds);
 
   const { dates, values: cleanValues } = template.generate(rng, SERIES_LENGTH);
@@ -106,6 +140,7 @@ export function generateCase(difficulty, usedTemplateIds = []) {
   const round2 = (v) => Math.round(v * 100) / 100;
 
   return {
+    genId: generateInstanceId(),
     templateId: template.id,
     case_name: scenario.case_name,
     scenario: scenario.scenario,

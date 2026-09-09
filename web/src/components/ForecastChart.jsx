@@ -4,48 +4,99 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Scatter,
   ComposedChart,
   Line,
+  Area,
   Label,
   ReferenceLine,
 } from 'recharts';
 import { formatValue } from '../game-logic/businessMetrics.js';
+import { CHART_COLORS } from '../game-logic/chartTheme.js';
+
+/**
+ * Same reasoning as ChartLevel.jsx's ChartTooltip: Area+Line pairs on the
+ * same dataKey would otherwise duplicate rows in the default Tooltip.
+ * Picks the single valid numeric entry and labels it Historical/Actual.
+ */
+function ForecastTooltip({ active, payload, label, unit }) {
+  if (!active || !payload || !payload.length) return null;
+  const entry = payload.find((p) => typeof p.value === 'number' && !isNaN(p.value));
+  if (!entry) return null;
+  return (
+    <div
+      style={{
+        fontSize: 12,
+        borderRadius: 6,
+        border: '1px solid var(--border)',
+        background: 'var(--surface-2)',
+        color: 'var(--ink)',
+        padding: '8px 10px',
+      }}
+    >
+      <div style={{ color: 'var(--ink-muted)', marginBottom: 2 }}>{label}</div>
+      <div>
+        {entry.dataKey === 'future' ? 'Actual' : 'Historical'}: {formatValue(entry.value, unit)}
+      </div>
+    </div>
+  );
+}
 
 /**
  * ForecastChart
  *
- * Shows the visible history as a line. Before the player submits a
- * guess, that's all it shows -- the whole point is predicting from the
- * visible trend alone. After submission, both the player's guess and
- * the real value are plotted at the target date so the gap is visible
- * at a glance.
+ * Before reveal: shows only the visible history, with a clearly labeled
+ * cutoff marker at the last known day -- the future is genuinely hidden,
+ * not just visually de-emphasized.
+ *
+ * After reveal: the actual future continues as a second, distinctly
+ * colored segment from the same cutoff point, so the real outcome reads
+ * as a direct continuation of the chart the player reasoned from.
  */
-export default function ForecastChart({ visibleSeries, unit, yLabel, targetDate, guessValue, actualValue }) {
-  const revealed = actualValue !== null && actualValue !== undefined;
+export default function ForecastChart({ visibleSeries, futureSeries, unit, yLabel, targetDate, revealed }) {
   const formatY = (v) => formatValue(v, unit);
+  const cutoffDate = visibleSeries[visibleSeries.length - 1]?.date;
 
-  const chartData = visibleSeries.map((p) => ({ date: p.date, value: p.value }));
-  if (revealed) {
-    chartData.push({ date: targetDate, actual: actualValue, guess: guessValue });
+  const chartData = visibleSeries.map((p) => ({ date: p.date, historical: p.value }));
+
+  if (revealed && futureSeries?.length) {
+    // Duplicate the cutoff point onto the "future" series so the two
+    // segments visually connect with no gap between them.
+    chartData[chartData.length - 1] = {
+      ...chartData[chartData.length - 1],
+      future: chartData[chartData.length - 1].historical,
+    };
+    for (const p of futureSeries) {
+      chartData.push({ date: p.date, future: p.value });
+    }
   }
 
   return (
     <div style={{ width: '100%', height: 340 }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <ComposedChart data={chartData} margin={{ top: 8, right: 12, bottom: 8, left: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <defs>
+            <linearGradient id="fc-hist-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CHART_COLORS.selected} stopOpacity={0.2} />
+              <stop offset="100%" stopColor={CHART_COLORS.selected} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="fc-future-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CHART_COLORS.creditHigh} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={CHART_COLORS.creditHigh} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 11, fill: 'var(--ink-faint)' }}
+            tick={{ fontSize: 11, fill: CHART_COLORS.axisText }}
             interval="preserveStartEnd"
             minTickGap={48}
-            axisLine={{ stroke: 'var(--border-strong)' }}
+            axisLine={{ stroke: CHART_COLORS.axisLine }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: 'var(--ink-faint)' }}
+            tick={{ fontSize: 11, fill: CHART_COLORS.axisText }}
             tickFormatter={formatY}
+            domain={['auto', 'auto']}
             width={64}
             axisLine={false}
             tickLine={false}
@@ -54,28 +105,58 @@ export default function ForecastChart({ visibleSeries, unit, yLabel, targetDate,
               value={yLabel}
               angle={-90}
               position="insideLeft"
-              style={{ fontSize: 11, fill: 'var(--ink-faint)', textAnchor: 'middle' }}
+              style={{ fontSize: 11, fill: CHART_COLORS.axisText, textAnchor: 'middle' }}
             />
           </YAxis>
-          <Tooltip
-            formatter={(value, name) => [formatValue(value, unit), name]}
-            labelFormatter={(label) => label}
-            contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', boxShadow: 'none' }}
+          <Tooltip content={<ForecastTooltip unit={unit} />} />
+          <ReferenceLine x={cutoffDate} stroke={CHART_COLORS.axisLine} strokeDasharray="4 4">
+            <Label
+              value={revealed ? 'Cutoff' : 'Forecast cutoff'}
+              position="top"
+              style={{ fontSize: 10, fill: CHART_COLORS.axisText }}
+            />
+          </ReferenceLine>
+          <Area
+            type="monotone"
+            dataKey="historical"
+            stroke="none"
+            fill="url(#fc-hist-gradient)"
+            isAnimationActive
+            animationDuration={600}
+            connectNulls
           />
-          {revealed && <ReferenceLine x={targetDate} stroke="var(--border-strong)" strokeDasharray="3 3" />}
           <Line
             type="monotone"
-            dataKey="value"
-            stroke="#3454d1"
+            dataKey="historical"
+            stroke={CHART_COLORS.line}
             strokeWidth={1.75}
             dot={false}
-            isAnimationActive={false}
+            isAnimationActive
+            animationDuration={600}
             connectNulls
           />
           {revealed && (
             <>
-              <Scatter dataKey="guess" fill="#3454d1" shape="circle" legendType="none" />
-              <Scatter dataKey="actual" fill="#1e7f4f" shape="star" legendType="none" />
+              <Area
+                type="monotone"
+                dataKey="future"
+                stroke="none"
+                fill="url(#fc-future-gradient)"
+                isAnimationActive
+                animationDuration={500}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="future"
+                stroke={CHART_COLORS.creditHigh}
+                strokeWidth={1.75}
+                strokeDasharray="5 3"
+                dot={false}
+                isAnimationActive
+                animationDuration={500}
+                connectNulls
+              />
             </>
           )}
         </ComposedChart>

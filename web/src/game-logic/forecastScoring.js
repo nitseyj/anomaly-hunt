@@ -1,35 +1,35 @@
 /**
  * forecastScoring.js
  *
- * Scores a Forecast Call guess by percentage error against the real
- * value, using the same "full credit near the target, fading to zero"
- * philosophy as the distance-based Anomaly Hunt scoring (scoring.js) --
- * consistent scoring logic across both game modes, just measured in
- * percent-error instead of chart-index distance.
+ * Scores a Forecast Call MCQ answer with confidence calibration: higher
+ * declared confidence amplifies BOTH the reward for being right and the
+ * penalty for being wrong. This is what makes "confidence" a real
+ * analytical signal rather than decoration -- a high-confidence wrong
+ * answer costs more than a low-confidence wrong answer, and the game
+ * rewards well-calibrated judgement (knowing when you're actually sure)
+ * over blind conviction.
  */
 
-const FULL_CREDIT_PCT = 5; // error at or under this earns full credit
-const ZERO_CREDIT_PCT = 40; // error at or over this earns nothing
-const MAX_POINTS = 100;
+const BASE_CORRECT_POINTS = 100;
+const BASE_INCORRECT_PENALTY = 20;
 
-export function scoreForecast(guess, actual) {
-  const denom = Math.max(Math.abs(actual), 1e-9);
-  const errorPct = (Math.abs(guess - actual) / denom) * 100;
+const CONFIDENCE_MULTIPLIERS = {
+  low: 0.8,
+  medium: 1.0,
+  high: 1.3,
+};
 
-  let creditFraction;
-  if (errorPct <= FULL_CREDIT_PCT) {
-    creditFraction = 1;
-  } else if (errorPct >= ZERO_CREDIT_PCT) {
-    creditFraction = 0;
-  } else {
-    creditFraction = 1 - (errorPct - FULL_CREDIT_PCT) / (ZERO_CREDIT_PCT - FULL_CREDIT_PCT);
+export const CONFIDENCE_LEVELS = ['low', 'medium', 'high'];
+
+export function scoreForecastAnswer(isCorrect, confidence) {
+  const multiplier = CONFIDENCE_MULTIPLIERS[confidence] ?? 1.0;
+
+  if (isCorrect) {
+    return { points: Math.round(BASE_CORRECT_POINTS * multiplier), multiplier };
   }
 
-  return {
-    errorPct: Math.round(errorPct * 10) / 10,
-    points: Math.round(creditFraction * MAX_POINTS),
-  };
+  const penalty = Math.round(BASE_INCORRECT_PENALTY * multiplier);
+  return { points: -penalty, multiplier };
 }
 
-export const FORECAST_FULL_CREDIT_PCT = FULL_CREDIT_PCT;
-export const FORECAST_ZERO_CREDIT_PCT = ZERO_CREDIT_PCT;
+export { CONFIDENCE_MULTIPLIERS };
