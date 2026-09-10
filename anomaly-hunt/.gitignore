@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node / Vite
+web/node_modules/
+web/dist/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
