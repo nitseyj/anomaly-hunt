@@ -35,6 +35,7 @@ export default function DailyChallengeGame({ onExit }) {
   const [stage, setStage] = useState(priorResult ? 'already-played' : 'briefing');
   const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [focusedIndex, setFocusedIndex] = useState(null);
+  const [yGuesses, setYGuesses] = useState({});
   const [showTable, setShowTable] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(TIME_LIMIT);
   const [result, setResult] = useState(null);
@@ -68,6 +69,7 @@ export default function DailyChallengeGame({ onExit }) {
         setStage(freshResult ? 'already-played' : 'briefing');
         setSelectedIndices(new Set());
         setFocusedIndex(null);
+        setYGuesses({});
       }
     }
     document.addEventListener('visibilitychange', checkForNewDay);
@@ -84,7 +86,13 @@ export default function DailyChallengeGame({ onExit }) {
   const submitGuesses = useCallback(() => {
     if (result) return;
     clearInterval(timerRef.current);
-    const scored = scoreRound([...selectedIndices], caseFile.ground_truth_anomalies, secondsRemaining);
+    const scored = scoreRound(
+      [...selectedIndices],
+      caseFile.ground_truth_anomalies,
+      secondsRemaining,
+      caseFile.series,
+      yGuesses
+    );
     const finalPoints = Math.max(0, scored.points - (hintUsed ? HINT_COST : 0));
     setResult({ ...scored, points: finalPoints });
 
@@ -119,7 +127,7 @@ export default function DailyChallengeGame({ onExit }) {
     });
 
     setStage('result');
-  }, [caseFile, selectedIndices, secondsRemaining, hintUsed, result]);
+  }, [caseFile, selectedIndices, secondsRemaining, hintUsed, result, yGuesses]);
 
   useEffect(() => {
     submitGuessesRef.current = submitGuesses;
@@ -155,6 +163,12 @@ export default function DailyChallengeGame({ onExit }) {
 
   function handleTableRowClick(idx) {
     setFocusedIndex(idx);
+    toggleIndex(idx);
+  }
+
+  function handleDartThrow(idx, guessedValue) {
+    setFocusedIndex(idx);
+    setYGuesses((prev) => ({ ...prev, [idx]: guessedValue }));
     toggleIndex(idx);
   }
 
@@ -211,7 +225,7 @@ export default function DailyChallengeGame({ onExit }) {
           unit={caseFile.unit}
           yLabel={caseFile.y_label}
           selectedIndices={selectedIndices}
-          onPointClick={stage === 'playing' ? setFocusedIndex : () => {}}
+          onDartThrow={stage === 'playing' ? handleDartThrow : () => {}}
           focusedIndex={focusedIndex}
           revealData={stage === 'result' ? { hits: result.hits, missedIndices } : null}
           showRollingAverage={hintUsed && stage !== 'result'}

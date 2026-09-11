@@ -74,6 +74,10 @@ export default function HomeScreen({ onSelectMode }) {
           <span className="dd-mode-meta">Best: {profile.bestForecastScore || '—'} pts</span>
         </button>
       </div>
+
+      <button className="dd-table-toggle" style={{ marginTop: 4 }} onClick={() => onSelectMode('import')}>
+        ▸ Import your own data — run Anomaly Hunt on a real dataset
+      </button>
     </div>
   );
 }

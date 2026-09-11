@@ -14,9 +14,10 @@ import { formatValue } from '../game-logic/businessMetrics.js';
 import { CHART_COLORS } from '../game-logic/chartTheme.js';
 
 /**
- * Same reasoning as ChartLevel.jsx's ChartTooltip: Area+Line pairs on the
- * same dataKey would otherwise duplicate rows in the default Tooltip.
- * Picks the single valid numeric entry and labels it Historical/Actual.
+ * A minimal custom tooltip: picks out exactly one valid numeric entry
+ * from the payload, since this chart layers an Area+Line pair on the
+ * same dataKey (a visible line plus a decorative gradient fill) --
+ * Recharts' default Tooltip would otherwise show a duplicated row.
  */
 function ForecastTooltip({ active, payload, label, unit }) {
   if (!active || !payload || !payload.length) return null;

@@ -153,3 +153,33 @@ export function generateCase(difficulty, usedTemplateIds = [], seed = null) {
 }
 
 export const DIFFICULTY_SEQUENCE = ['easy', 'medium', 'medium', 'hard', 'hard'];
+
+/**
+ * Builds one case from an imported {date, value} series instead of a
+ * procedural template -- reuses the exact same anomaly injection and
+ * clamping pipeline as generateCase(), so imported data is scored,
+ * detected, and displayed identically to generated data. Each call
+ * injects a fresh random anomaly into the SAME imported values, which
+ * is how a single import can still power multiple different rounds.
+ */
+export function generateCaseFromSeries(series, unit, difficulty, caseName) {
+  const rng = mulberry32(Math.floor(Math.random() * 2 ** 31));
+  const dates = series.map((p) => p.date);
+  const cleanValues = series.map((p) => p.value);
+
+  const { values: injectedValues, groundTruth } = injectAnomalies(cleanValues, difficulty, rng);
+  const clampedValues = clampToUnit(injectedValues, unit);
+  const round2 = (v) => Math.round(v * 100) / 100;
+
+  return {
+    genId: generateInstanceId(),
+    templateId: 'imported',
+    case_name: caseName || 'Custom Data Investigation',
+    scenario: 'Your own imported dataset. Find whatever looks out of place.',
+    y_label: 'Value',
+    unit: unit || 'count',
+    difficulty,
+    series: dates.map((date, i) => ({ date, value: round2(clampedValues[i]) })),
+    ground_truth_anomalies: groundTruth,
+  };
+}

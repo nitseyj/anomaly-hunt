@@ -1,5 +1,17 @@
 import { formatValue } from '../game-logic/businessMetrics.js';
 
+/** A simple hand icon shown next to the slider thumb while dragging -- reinforces that the slider is "a hand carefully placing the dart," distinct from the chart's free throw. */
+function HandIcon() {
+  return (
+    <svg width="18" height="22" viewBox="0 0 18 22" style={{ display: 'block' }}>
+      <rect x="5" y="9" width="8" height="11" rx="4" fill="var(--accent)" />
+      <rect x="3" y="6" width="3" height="9" rx="1.5" fill="var(--accent)" />
+      <rect x="7" y="4" width="3" height="11" rx="1.5" fill="var(--accent)" />
+      <rect x="11" y="5" width="3" height="10" rx="1.5" fill="var(--accent)" />
+    </svg>
+  );
+}
+
 /**
  * DaySlider
  *
@@ -9,24 +21,35 @@ import { formatValue } from '../game-logic/businessMetrics.js';
  * pinpoint, one-day-at-a-time accuracy across the whole series in a
  * single gesture, and works identically on every browser/device since
  * it's a standard form control, not a custom hit-testing layer.
+ *
+ * A small hand icon appears above the thumb while actively dragging (CSS
+ * :active, no JS drag-tracking needed) -- visually distinct from the
+ * chart's free-throw dart, reinforcing that the slider is a precise,
+ * guided placement rather than a thrown guess.
  */
 export function DaySlider({ series, unit, focusedIndex, onChange, disabled }) {
   const value = focusedIndex ?? 0;
   const point = series[value];
+  const percent = series.length > 1 ? (value / (series.length - 1)) * 100 : 0;
 
   return (
     <div className="dd-day-slider">
-      <input
-        type="range"
-        min={0}
-        max={series.length - 1}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        disabled={disabled}
-        className="dd-day-slider-input"
-        aria-label="Select a day"
-      />
+      <div className="dd-day-slider-track-wrap">
+        <input
+          type="range"
+          min={0}
+          max={series.length - 1}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          disabled={disabled}
+          className="dd-day-slider-input"
+          aria-label="Select a day"
+        />
+        <div className="dd-slider-hand" style={{ left: `${percent}%` }} aria-hidden="true">
+          <HandIcon />
+        </div>
+      </div>
       <div className="dd-day-slider-readout">
         <span className="dd-mono">{point.date}</span>
         <span>{formatValue(point.value, unit)}</span>

@@ -6,7 +6,7 @@ import ScoreBoard from './ScoreBoard.jsx';
 import HintPanel, { HINT_COST } from './HintPanel.jsx';
 import { scoreRound, TIME_LIMIT, CREDIT_RADIUS, MAX_FLAGS_PER_CASE } from '../game-logic/scoring.js';
 import { getScores, submitScore } from '../game-logic/leaderboard.js';
-import { generateCase, DIFFICULTY_SEQUENCE } from '../game-logic/anomalyGenerator.js';
+import { generateCase, generateCaseFromSeries, DIFFICULTY_SEQUENCE } from '../game-logic/anomalyGenerator.js';
 import { runAllDetectors, evaluateDetector } from '../game-logic/detectClient.js';
 import { DETECTOR_META } from '../game-logic/chartTheme.js';
 import { recordGameResult, recordAnomalyCase } from '../game-logic/profile.js';
@@ -23,7 +23,7 @@ const ANOMALY_TYPE_LABELS = {
 };
 
 // Stages: 'briefing' -> 'playing' -> 'result' -> (loop) -> 'gameover'
-export default function AnomalyHuntGame({ onExit }) {
+export default function AnomalyHuntGame({ onExit, customImport }) {
   const [stage, setStage] = useState('briefing');
   const [caseIdx, setCaseIdx] = useState(0);
   const [caseFile, setCaseFile] = useState(null);
@@ -31,6 +31,7 @@ export default function AnomalyHuntGame({ onExit }) {
 
   const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [focusedIndex, setFocusedIndex] = useState(null);
+  const [yGuesses, setYGuesses] = useState({});
   const [showTable, setShowTable] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(TIME_LIMIT);
   const [result, setResult] = useState(null);
@@ -54,11 +55,14 @@ export default function AnomalyHuntGame({ onExit }) {
 
   function loadCase(idx, priorUsedTemplates) {
     const difficulty = DIFFICULTY_SEQUENCE[idx];
-    const next = generateCase(difficulty, priorUsedTemplates);
+    const next = customImport
+      ? generateCaseFromSeries(customImport.series, customImport.unit, difficulty, 'Custom Data Investigation')
+      : generateCase(difficulty, priorUsedTemplates);
     setCaseFile(next);
     setUsedTemplates([...priorUsedTemplates, next.templateId]);
     setSelectedIndices(new Set());
     setFocusedIndex(null);
+    setYGuesses({});
     setSecondsRemaining(TIME_LIMIT);
     setResult(null);
     setDetectorResults(null);
@@ -74,7 +78,13 @@ export default function AnomalyHuntGame({ onExit }) {
   const submitGuesses = useCallback(() => {
     if (!caseFile || result) return;
     clearInterval(timerRef.current);
-    const scored = scoreRound([...selectedIndices], caseFile.ground_truth_anomalies, secondsRemaining);
+    const scored = scoreRound(
+      [...selectedIndices],
+      caseFile.ground_truth_anomalies,
+      secondsRemaining,
+      caseFile.series,
+      yGuesses
+    );
     const finalPoints = Math.max(0, scored.points - (hintUsed ? HINT_COST : 0));
     setResult({ ...scored, points: finalPoints });
     setTotalPoints((prev) => prev + finalPoints);
@@ -117,7 +127,7 @@ export default function AnomalyHuntGame({ onExit }) {
     });
 
     setStage('result');
-  }, [caseFile, selectedIndices, secondsRemaining, hintUsed, result]);
+  }, [caseFile, selectedIndices, secondsRemaining, hintUsed, result, yGuesses]);
 
   useEffect(() => {
     submitGuessesRef.current = submitGuesses;
@@ -156,6 +166,19 @@ export default function AnomalyHuntGame({ onExit }) {
   // flags directly in one action instead of only moving focus.
   function handleTableRowClick(idx) {
     setFocusedIndex(idx);
+    toggleIndex(idx);
+  }
+
+  // Throwing a dart at the chart is itself the commit action (matching
+  // how darts actually work -- you don't "aim" and then separately
+  // "confirm the throw"): it moves focus, records how far off the throw
+  // landed vertically (used by scoreRound's 2D credit calculation), and
+  // flags the day in one motion. The slider/table stay a deliberate
+  // two-step flow (move focus, then press Flag) since those are precise
+  // by construction and don't need a single-gesture shortcut.
+  function handleDartThrow(idx, guessedValue) {
+    setFocusedIndex(idx);
+    setYGuesses((prev) => ({ ...prev, [idx]: guessedValue }));
     toggleIndex(idx);
   }
 
@@ -222,7 +245,7 @@ export default function AnomalyHuntGame({ onExit }) {
           unit={caseFile.unit}
           yLabel={caseFile.y_label}
           selectedIndices={selectedIndices}
-          onPointClick={stage === 'playing' ? setFocusedIndex : () => {}}
+          onDartThrow={stage === 'playing' ? handleDartThrow : () => {}}
           focusedIndex={focusedIndex}
           revealData={stage === 'result' ? { hits: result.hits, missedIndices } : null}
           showRollingAverage={hintUsed && stage !== 'result'}

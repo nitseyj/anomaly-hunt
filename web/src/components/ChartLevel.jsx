@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import {
   XAxis,
   YAxis,
@@ -13,6 +14,14 @@ import {
 import { CREDIT_RADIUS } from '../game-logic/scoring.js';
 import { formatValue } from '../game-logic/businessMetrics.js';
 import { CHART_COLORS, DETECTOR_META } from '../game-logic/chartTheme.js';
+
+// These MUST match the ComposedChart's own margin/axis-width props below --
+// they're not guessed from Recharts' rendering, they're the exact same
+// numbers, so the click-overlay's pixel math and the chart's own plotted
+// area are guaranteed to agree rather than drifting apart.
+const CHART_MARGIN = { top: 8, right: 12, bottom: 8, left: 4 };
+const Y_AXIS_WIDTH = 64;
+const X_AXIS_HEIGHT = 24;
 
 /**
  * A small marker used for the focused point, flagged points, and (post-
@@ -59,6 +68,17 @@ function DetectorMarker({ cx, cy, color, rowOffset }) {
   return <polygon points={`${cx},${top - size} ${cx - size},${top + size} ${cx + size},${top + size}`} fill={color} />;
 }
 
+/** A simple dart-like marker: a landing point with a small shaft/flight, matching the app's plain-SVG visual language rather than an emoji. */
+function DartIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" style={{ display: 'block', overflow: 'visible' }}>
+      <circle cx="11" cy="11" r="3.5" fill={CHART_COLORS.selected} style={{ filter: `drop-shadow(0 0 5px ${CHART_COLORS.selected}88)` }} />
+      <line x1="11" y1="11" x2="18" y2="4" stroke={CHART_COLORS.selected} strokeWidth="2" strokeLinecap="round" />
+      <path d="M18 4 L21.5 2.5 L19.5 6 Z" fill={CHART_COLORS.selected} />
+    </svg>
+  );
+}
+
 /**
  * ChartLevel
  *
@@ -79,7 +99,7 @@ export default function ChartLevel({
   unit,
   yLabel,
   selectedIndices,
-  onPointClick,
+  onDartThrow,
   focusedIndex,
   revealData,
   showRollingAverage,
@@ -87,6 +107,9 @@ export default function ChartLevel({
   layers,
 }) {
   const chartData = series.map((point, idx) => ({ idx, date: point.date, value: point.value }));
+  const overlayRef = useRef(null);
+  const [justThrew, setJustThrew] = useState(false);
+  const [hoverPosition, setHoverPosition] = useState(null);
 
   if (showRollingAverage) {
     const window = 14;
@@ -100,13 +123,68 @@ export default function ChartLevel({
 
   const formatY = (v) => formatValue(v, unit);
 
-  function handleChartClick(chartState) {
-    if (revealData || !chartState || chartState.activeTooltipIndex == null) return;
-    onPointClick(chartState.activeTooltipIndex);
+  // The series' own value range -- used both to convert a raw click's Y
+  // pixel position into a data value, and to keep the dart marker's
+  // vertical placement consistent with what the chart actually renders.
+  // The YAxis domain below is set to these SAME explicit values (with a
+  // small padding baked in) rather than Recharts' auto-domain, so the
+  // overlay's pixel math and the rendered chart can't drift apart.
+  const values = chartData.map((p) => p.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const rawRange = rawMax - rawMin || 1;
+  const yMin = rawMin - rawRange * 0.05;
+  const yMax = rawMax + rawRange * 0.05;
+  const yRange = yMax - yMin;
+
+  /**
+   * Captures a raw click anywhere over the plot area and converts it into
+   * a (day index, guessed value) pair -- this is what makes the chart a
+   * genuine free-aim target instead of only ever snapping onto the curve.
+   * Uses a plain DOM overlay rather than Recharts' click event, since the
+   * overlay's pixel math is fully within our control (see CHART_MARGIN /
+   * Y_AXIS_WIDTH / X_AXIS_HEIGHT above) rather than depending on Recharts
+   * internals that can't be verified without a live browser.
+   */
+  function handleOverlayClick(e) {
+    if (revealData || !onDartThrow) return;
+    const rect = overlayRef.current.getBoundingClientRect();
+    const xFraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const yFraction = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+    const idx = Math.round(xFraction * (chartData.length - 1));
+    const guessedValue = yMin + yFraction * yRange;
+
+    onDartThrow(idx, guessedValue, { xFraction, yFraction });
+    setJustThrew(true);
+    setTimeout(() => setJustThrew(false), 260);
+  }
+
+  function handleOverlayMouseMove(e) {
+    if (revealData) return;
+    const rect = overlayRef.current.getBoundingClientRect();
+    const xFraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const yFraction = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+    setHoverPosition({ xFraction, yFraction });
+  }
+
+  function handleOverlayMouseLeave() {
+    setHoverPosition(null);
+  }
+
+  // Where the dart marker sits: at the last free-thrown spot if the throw
+  // landed on the currently-focused day, otherwise "perfect aim" -- right
+  // on the curve at the focused day (matches how the slider/table always
+  // aim exactly at the real value). This is what makes moving the slider
+  // look like the dart sliding smoothly into a new, precise position
+  // rather than a fresh throw.
+  let dartPosition = null;
+  if (!revealData && focusedIndex != null) {
+    const onCurveX = focusedIndex / Math.max(1, chartData.length - 1);
+    const onCurveY = (chartData[focusedIndex].value - yMin) / yRange;
+    dartPosition = { xFraction: onCurveX, yFraction: onCurveY };
   }
 
   // Sparse marker sets -- never one entry per data point.
-  const focusedPoint = !revealData && focusedIndex != null ? [chartData[focusedIndex]] : [];
   const flaggedPoints = !revealData ? [...selectedIndices].map((idx) => chartData[idx]) : [];
 
   // "Yours" layer: one marker per point you clicked, blue if it earned
@@ -133,13 +211,12 @@ export default function ChartLevel({
 
   return (
     <div>
-      <div className="dd-chart-container">
+      <div className="dd-chart-container" style={{ position: 'relative' }}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <ComposedChart
             data={chartData}
-            margin={{ top: 8, right: 12, bottom: 8, left: 4 }}
-            onClick={handleChartClick}
-            style={{ cursor: revealData ? 'default' : 'pointer' }}
+            margin={CHART_MARGIN}
+            style={{ cursor: revealData ? 'default' : 'none' }}
           >
             <defs>
               <linearGradient id="ah-area-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -151,6 +228,7 @@ export default function ChartLevel({
             <XAxis
               type="category"
               dataKey="date"
+              height={X_AXIS_HEIGHT}
               tick={{ fontSize: 11, fill: CHART_COLORS.axisText }}
               interval={tickInterval}
               axisLine={{ stroke: CHART_COLORS.axisLine }}
@@ -159,8 +237,8 @@ export default function ChartLevel({
             <YAxis
               tick={{ fontSize: 11, fill: CHART_COLORS.axisText }}
               tickFormatter={formatY}
-              domain={['auto', 'auto']}
-              width={64}
+              domain={[yMin, yMax]}
+              width={Y_AXIS_WIDTH}
               axisLine={false}
               tickLine={false}
             >
@@ -205,15 +283,6 @@ export default function ChartLevel({
               />
             )}
 
-            {focusedPoint.length > 0 && (
-              <Scatter
-                data={focusedPoint}
-                dataKey="value"
-                shape={(props) => <PointMarker {...props} ring stroke={CHART_COLORS.selected} r={9} />}
-                legendType="none"
-                isAnimationActive={false}
-              />
-            )}
             {flaggedPoints.length > 0 && (
               <Scatter
                 data={flaggedPoints}
@@ -267,11 +336,53 @@ export default function ChartLevel({
               ))}
           </ComposedChart>
         </ResponsiveContainer>
+
+        {!revealData && (
+          <div
+            ref={overlayRef}
+            className="dd-dart-overlay"
+            onClick={handleOverlayClick}
+            onMouseMove={handleOverlayMouseMove}
+            onMouseLeave={handleOverlayMouseLeave}
+            style={{
+              position: 'absolute',
+              top: CHART_MARGIN.top,
+              left: CHART_MARGIN.left + Y_AXIS_WIDTH,
+              right: CHART_MARGIN.right,
+              bottom: CHART_MARGIN.bottom + X_AXIS_HEIGHT,
+            }}
+          >
+            {hoverPosition && (
+              <div
+                className="dd-dart dd-dart--preview"
+                style={{
+                  left: `${hoverPosition.xFraction * 100}%`,
+                  top: `${(1 - hoverPosition.yFraction) * 100}%`,
+                }}
+                aria-hidden="true"
+              >
+                <DartIcon />
+              </div>
+            )}
+            {dartPosition && (
+              <div
+                className={`dd-dart ${justThrew ? 'dd-dart--thrown' : ''}`}
+                style={{
+                  left: `${dartPosition.xFraction * 100}%`,
+                  top: `${(1 - dartPosition.yFraction) * 100}%`,
+                }}
+                aria-hidden="true"
+              >
+                <DartIcon />
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <p className="dd-chart-caption">
         {revealData
           ? 'Toggle layers above to compare your flags against the true anomalies and each statistical detector.'
-          : `Drag the slider below to browse — dragging alone won't flag anything. Press the Flag button when a day looks wrong. Being within ${CREDIT_RADIUS} days of the real answer still earns partial credit.`}
+          : `Throw a dart anywhere on the chart to flag that spot — you don't have to hit the line exactly. The closer to the true day AND value, the more credit you earn. Drag the slider below for a precise, guided throw instead.`}
       </p>
     </div>
   );

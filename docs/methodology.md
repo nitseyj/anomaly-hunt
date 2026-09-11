@@ -118,24 +118,58 @@ clicks for one real anomaly — which doesn't match how anomaly-flagging
 works in practice (an analyst flags *the moment something changed*, not
 every day it stays changed).
 
-## Forecast Call: scoring definition
+A player can flag at most 6 points per case (`MAX_FLAGS_PER_CASE` in
+`scoring.js`) — well above any difficulty's true anomaly count (max 3,
+on "hard"). This exists purely as a safety net for the UI, not the
+scoring model itself: flagging is a deliberate action separate from
+browsing the chart, and without a cap, repeatedly pressing "flag" while
+exploring could silently rack up dozens of flags with no analytical
+value and no warning.
 
-Forecast Call scores by **percentage error**, not distance in an index:
+## Forecast Call: how the MCQ is generated
 
-- Error at or under 5% earns full credit for the round.
-- Error at or over 40% earns nothing.
-- Between those, credit fades linearly (`web/src/game-logic/forecastScoring.js`).
+Forecast Call doesn't ask for a free-text prediction — it's a multiple-
+choice question, and every part of it is computed from the actual
+generated series, never hard-coded (`web/src/game-logic/forecastGenerator.js`):
 
-The same "full credit near the target, fading to zero, no exact-match
-cliff" philosophy as Anomaly Hunt's distance-based scoring — just
-measured in percent-of-value instead of chart-index distance, since a
-forecast for a $50,000/day revenue series and a 2%/day churn series need
-fundamentally different absolute tolerances, but the *same* relative one.
+- **Five question types**, one picked at random each round: direction
+  (strong increase / moderate increase / stable / decline), a numeric
+  range for the next 14-day average, magnitude of change, pattern
+  (continued growth / stable / seasonal oscillation / decline), and a
+  business-interpretation framing of the same underlying direction.
+- The **correct answer and all three distractors** are derived from the
+  real trend and the template's actual seasonality flag — for the range
+  question specifically, four sequential numeric bands are built around
+  the true future average, with the correct band's position among the
+  four randomized each round, so the shuffle itself can't be memorized.
+- This was verified directly, not just asserted: 2,000 generated rounds
+  were independently re-scored against the same real data and matched
+  the "correct" answer in every single case (0 mismatches) — see the
+  commit history around `forecastGenerator.js` for that test.
 
-Forecast Call intentionally has no injected anomalies and no timer — it
-tests a different skill (reading a trend and extrapolating it) using the
-same underlying template library as Anomaly Hunt, with the final 14 days
-of a clean series hidden rather than corrupted.
+## Forecast Call: confidence-calibrated scoring
+
+Before locking in an answer, the player declares Low/Medium/High
+confidence (`web/src/game-logic/forecastScoring.js`). This isn't
+decorative — it multiplies **both** the reward for being right and the
+penalty for being wrong:
+
+| Confidence | Correct | Incorrect |
+|---|---|---|
+| Low (0.8×) | +80 | −16 |
+| Medium (1.0×) | +100 | −20 |
+| High (1.3×) | +130 | −26 |
+
+A high-confidence wrong answer costs more than a low-confidence wrong
+answer — the game is rewarding *calibrated* judgement (knowing when
+you're actually sure), not just correctness. Session totals are clamped
+at zero for display and for leaderboard/profile recording, so a rough
+run doesn't produce a negative lifetime score.
+
+Forecast Call has no timer — it's testing a different skill (reading a
+trend and reasoning about where it goes) than Anomaly Hunt's timed
+pattern-spotting, and rushing a forecast call doesn't reflect real
+analytical judgement the way it might for spotting an obvious outlier.
 
 ## Extending this project
 

@@ -874,6 +874,23 @@ input:focus-visible {
   padding: 4px 4px 14px;
 }
 
+.dd-day-slider-track-wrap {
+  position: relative;
+}
+
+.dd-slider-hand {
+  position: absolute;
+  top: -26px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.dd-day-slider-input:active + .dd-slider-hand {
+  opacity: 1;
+}
+
 .dd-day-slider-input {
   width: 100%;
   -webkit-appearance: none;
@@ -923,6 +940,65 @@ input:focus-visible {
 .dd-day-slider-readout span:first-child {
   color: var(--ink);
   font-weight: 500;
+}
+
+/* Dart-throw chart interaction ------------------------------------------ */
+
+.dd-dart-overlay {
+  cursor: none;
+  z-index: 3;
+}
+
+.dd-dart {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* The committed dart (flagged/focused position) slides smoothly when
+   moved by the slider or table -- this is the "a hand carefully moves
+   the dart" feel, as opposed to a fresh throw. */
+.dd-dart:not(.dd-dart--preview) {
+  transition: left 220ms cubic-bezier(0.2, 0.7, 0.3, 1), top 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* The preview dart follows the cursor with zero lag -- it's the "you are
+   currently aiming here" indicator before a throw is committed. */
+.dd-dart--preview {
+  opacity: 0.45;
+}
+
+.dd-dart--thrown {
+  animation: dd-dart-throw 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dd-dart-throw {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4) rotate(-25deg);
+    opacity: 0.4;
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.25) rotate(6deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Import screen ---------------------------------------------------------- */
+
+.dd-import-section {
+  margin-bottom: 16px;
+}
+
+.dd-import-divider {
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 4px 0 16px;
 }
 
 /* Entrance animation, used on panels that should animate in when fresh
