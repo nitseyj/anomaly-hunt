@@ -28,13 +28,31 @@ function quantile(sorted, q) {
   return sorted[base];
 }
 
+/**
+ * Baseline window around index i, EXCLUDING i itself -- the point being
+ * tested must never contribute to its own "what's normal here" baseline.
+ * Folding it in dilutes the baseline toward the very point you're testing
+ * (worst on small windows: with window=10 a single strong point spike pulls
+ * the window mean toward itself and inflates the window's own std enough
+ * that its z-score can land BELOW threshold, i.e. an obvious spike goes
+ * undetected purely because it was allowed to vouch for its own normalcy).
+ */
+function windowExcluding(values, i, window) {
+  const n = values.length;
+  const start = Math.max(0, i - Math.floor(window / 2));
+  const end = Math.min(n, i + Math.floor(window / 2) + 1);
+  const out = [];
+  for (let j = start; j < end; j++) {
+    if (j !== i) out.push(values[j]);
+  }
+  return out;
+}
+
 export function rollingZScoreDetect(values, window = 10, threshold = 3.0) {
   const n = values.length;
   const flags = new Array(n).fill(false);
   for (let i = 0; i < n; i++) {
-    const start = Math.max(0, i - Math.floor(window / 2));
-    const end = Math.min(n, i + Math.floor(window / 2) + 1);
-    const windowVals = values.slice(start, end);
+    const windowVals = windowExcluding(values, i, window);
     const m = mean(windowVals);
     const s = std(windowVals) || 1e-9;
     const z = Math.abs((values[i] - m) / s);
@@ -47,9 +65,7 @@ export function iqrDetect(values, window = 20, k = 1.5) {
   const n = values.length;
   const flags = new Array(n).fill(false);
   for (let i = 0; i < n; i++) {
-    const start = Math.max(0, i - Math.floor(window / 2));
-    const end = Math.min(n, i + Math.floor(window / 2) + 1);
-    const sorted = [...values.slice(start, end)].sort((a, b) => a - b);
+    const sorted = windowExcluding(values, i, window).sort((a, b) => a - b);
     const q1 = quantile(sorted, 0.25);
     const q3 = quantile(sorted, 0.75);
     const iqr = q3 - q1;

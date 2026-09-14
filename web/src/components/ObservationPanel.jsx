@@ -1,16 +1,5 @@
+import { useState, useEffect } from 'react';
 import { formatValue } from '../game-logic/businessMetrics.js';
-
-/** A simple hand icon shown next to the slider thumb while dragging -- reinforces that the slider is "a hand carefully placing the dart," distinct from the chart's free throw. */
-function HandIcon() {
-  return (
-    <svg width="18" height="22" viewBox="0 0 18 22" style={{ display: 'block' }}>
-      <rect x="5" y="9" width="8" height="11" rx="4" fill="var(--accent)" />
-      <rect x="3" y="6" width="3" height="9" rx="1.5" fill="var(--accent)" />
-      <rect x="7" y="4" width="3" height="11" rx="1.5" fill="var(--accent)" />
-      <rect x="11" y="5" width="3" height="10" rx="1.5" fill="var(--accent)" />
-    </svg>
-  );
-}
 
 /**
  * DaySlider
@@ -22,15 +11,27 @@ function HandIcon() {
  * single gesture, and works identically on every browser/device since
  * it's a standard form control, not a custom hit-testing layer.
  *
- * A small hand icon appears above the thumb while actively dragging (CSS
- * :active, no JS drag-tracking needed) -- visually distinct from the
- * chart's free-throw dart, reinforcing that the slider is a precise,
- * guided placement rather than a thrown guess.
+ * Reports drag start/end via onDraggingChange so the PARENT can show a
+ * "hand moving the dart" indicator on the CHART itself (where the dart
+ * actually is), rather than on the slider -- this component only
+ * reports the drag state, it doesn't render any hand of its own.
  */
-export function DaySlider({ series, unit, focusedIndex, onChange, disabled }) {
+export function DaySlider({ series, unit, focusedIndex, onChange, onDraggingChange, disabled }) {
   const value = focusedIndex ?? 0;
   const point = series[value];
-  const percent = series.length > 1 ? (value / (series.length - 1)) * 100 : 0;
+
+  useEffect(() => {
+    function stopDragging() {
+      onDraggingChange?.(false);
+    }
+    window.addEventListener('mouseup', stopDragging);
+    window.addEventListener('touchend', stopDragging);
+    return () => {
+      window.removeEventListener('mouseup', stopDragging);
+      window.removeEventListener('touchend', stopDragging);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="dd-day-slider">
@@ -42,13 +43,12 @@ export function DaySlider({ series, unit, focusedIndex, onChange, disabled }) {
           step={1}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
+          onMouseDown={() => onDraggingChange?.(true)}
+          onTouchStart={() => onDraggingChange?.(true)}
           disabled={disabled}
           className="dd-day-slider-input"
           aria-label="Select a day"
         />
-        <div className="dd-slider-hand" style={{ left: `${percent}%` }} aria-hidden="true">
-          <HandIcon />
-        </div>
       </div>
       <div className="dd-day-slider-readout">
         <span className="dd-mono">{point.date}</span>

@@ -8,6 +8,7 @@
  */
 
 import { mulberry32, stdDev, clampToUnit, pickTemplate, generateInstanceId, SERIES_LENGTH } from './businessMetrics.js';
+import { CREDIT_RADIUS } from './scoring.js';
 
 const ANOMALY_TYPES = ['point_spike', 'level_shift', 'missing_gap', 'trend_break'];
 
@@ -31,11 +32,32 @@ function injectAnomalies(values, difficulty, rng) {
     const j = Math.floor(rng() * (i + 1));
     [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
-  // keep chosen anomalies reasonably spaced apart so they don't visually merge
-  const chosen = [];
-  for (const idx of candidates) {
-    if (chosen.every((c) => Math.abs(c - idx) > n * 0.12)) chosen.push(idx);
-    if (chosen.length === settings.nAnomalies) break;
+  // Keep chosen anomalies spaced far enough apart that their credit
+  // radii (see scoring.js) never overlap -- otherwise a single flag
+  // placed between two nearby anomalies could be the closest match for
+  // BOTH at once, silently double-counting credit for one flag. Spacing
+  // must exceed 2x the radius for that to be impossible; n*0.12 was
+  // tuned for the old, smaller radius and needs the max() to keep up.
+  const minSpacing = Math.max(n * 0.12, CREDIT_RADIUS * 2 + 2);
+
+  // A single greedy pass over one shuffle can easily fail to seat every
+  // anomaly even when a valid arrangement exists (it doesn't backtrack),
+  // which used to silently fall through to ignoring spacing entirely --
+  // defeating the guarantee above far more often than intended once the
+  // radius grew. Retry with fresh shuffles first; only give up on
+  // spacing (the fallback below) if every attempt genuinely can't fit.
+  let chosen = [];
+  for (let attempt = 0; attempt < 25 && chosen.length < settings.nAnomalies; attempt++) {
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    const attemptChosen = [];
+    for (const idx of candidates) {
+      if (attemptChosen.every((c) => Math.abs(c - idx) > minSpacing)) attemptChosen.push(idx);
+      if (attemptChosen.length === settings.nAnomalies) break;
+    }
+    if (attemptChosen.length > chosen.length) chosen = attemptChosen;
   }
   // Fallback: if the spacing rule couldn't seat every requested anomaly
   // (only possible on very short series), fill remaining slots ignoring

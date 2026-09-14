@@ -74,12 +74,24 @@ export function clampToUnit(values, unit) {
   return values.map((v) => Math.max(floor, v));
 }
 
+// Guards against floating-point noise (e.g. 0.1 * 12 === 1.2000000000000002
+// in JS) leaking into the display for any value that wasn't already
+// rounded at generation time -- computed Y-axis tick values in particular.
+// Rounds rather than toFixed()-ing so already-clean numbers still print
+// without padded trailing zeros (3 stays "3", not "3.00").
+const round2 = (v) => Math.round(v * 100) / 100;
+
 export const UNIT_FORMATTERS = {
   usd: (v) => `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-  percent: (v) => `${v}%`,
-  ms: (v) => `${v}ms`,
-  count: (v) => Number(v).toLocaleString(),
-  roas: (v) => `${v}x`,
+  percent: (v) => `${round2(v)}%`,
+  ms: (v) => `${round2(v)}ms`,
+  // A count is discrete (users, tickets) -- the underlying series keeps
+  // 2-decimal precision (round2 in anomalyGenerator.js) so chart/scoring
+  // math stays smooth, but displaying e.g. "4,916.03 daily active users"
+  // or "97.08 tickets opened" doesn't make sense for something you can't
+  // have a fraction of, so round to a whole number only at display time.
+  count: (v) => Math.round(v).toLocaleString(),
+  roas: (v) => `${round2(v)}x`,
 };
 
 export function formatValue(value, unit) {

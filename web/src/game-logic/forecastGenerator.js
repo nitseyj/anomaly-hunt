@@ -69,8 +69,21 @@ function buildExplanation(metricLabel, unit, recentAvg, futureAvg, pctChange, ha
 }
 
 function buildRangeQuestion(rng, unit, futureAvg) {
-  const relativeWidth = Math.max(Math.abs(futureAvg) * 0.1, UNIT_BAND_FLOOR[unit] ?? 1);
+  let relativeWidth = Math.max(Math.abs(futureAvg) * 0.1, UNIT_BAND_FLOOR[unit] ?? 1);
   const correctSlot = Math.floor(rng() * 4);
+  // For a metric sitting close to its natural floor (e.g. a churn/defect
+  // rate near 0%), a full-width ladder centered on futureAvg can dip below
+  // zero for the earlier slots. Clamping each band's edges to 0 independently
+  // (the old approach) collapsed those slots into duplicate/zero-width
+  // "0% – 0%" options -- and worse, could silently shift futureAvg into a
+  // DIFFERENT band than the one reported as correct. Shrinking the band
+  // width instead keeps all 4 bands distinct, non-negative, and correctly
+  // centered on futureAvg, at the cost of narrower (never wider) bands only
+  // in this edge case.
+  const maxWidthKeepingNonNegative = futureAvg / (correctSlot + 0.5);
+  if (maxWidthKeepingNonNegative > 0 && maxWidthKeepingNonNegative < relativeWidth) {
+    relativeWidth = maxWidthKeepingNonNegative;
+  }
   // bandsStart is chosen so futureAvg sits at the midpoint of bands[correctSlot] --
   // this guarantees the true value always falls in exactly one option, with that
   // option's position among the 4 randomized every round.

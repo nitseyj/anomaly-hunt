@@ -36,6 +36,7 @@ export default function DailyChallengeGame({ onExit }) {
   const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [focusedIndex, setFocusedIndex] = useState(null);
   const [yGuesses, setYGuesses] = useState({});
+  const [sliderDragging, setSliderDragging] = useState(false);
   const [showTable, setShowTable] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(TIME_LIMIT);
   const [result, setResult] = useState(null);
@@ -227,6 +228,8 @@ export default function DailyChallengeGame({ onExit }) {
           selectedIndices={selectedIndices}
           onDartThrow={stage === 'playing' ? handleDartThrow : () => {}}
           focusedIndex={focusedIndex}
+          yGuesses={yGuesses}
+          sliderDragging={sliderDragging}
           revealData={stage === 'result' ? { hits: result.hits, missedIndices } : null}
           showRollingAverage={hintUsed && stage !== 'result'}
           detectorFlagsByType={stage === 'result' ? detectorResults?.flagsByDetector : null}
@@ -238,6 +241,7 @@ export default function DailyChallengeGame({ onExit }) {
             unit={caseFile.unit}
             focusedIndex={focusedIndex}
             onChange={setFocusedIndex}
+            onDraggingChange={setSliderDragging}
             disabled={!!result}
           />
         )}

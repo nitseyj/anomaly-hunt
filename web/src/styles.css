@@ -878,21 +878,7 @@ input:focus-visible {
   position: relative;
 }
 
-.dd-slider-hand {
-  position: absolute;
-  top: -26px;
-  transform: translateX(-50%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-}
-
-.dd-day-slider-input:active + .dd-slider-hand {
-  opacity: 1;
-}
-
-.dd-day-slider-input {
-  width: 100%;
+.dd-day-slider-input {  width: 100%;
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
@@ -951,7 +937,10 @@ input:focus-visible {
 
 .dd-dart {
   position: absolute;
-  transform: translate(-50%, -50%);
+  /* The dart's TIP (bottom of its SVG) is what should land exactly on
+     the click point, not the icon's visual center -- so anchor by the
+     bottom edge, centered horizontally, not by the middle. */
+  transform: translate(-50%, -100%);
   pointer-events: none;
 }
 
@@ -962,6 +951,14 @@ input:focus-visible {
   transition: left 220ms cubic-bezier(0.2, 0.7, 0.3, 1), top 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
+/* While the slider is actively being dragged, the dart must track the
+   pointer 1:1 with zero lag -- the 220ms "carried by hand" easing above
+   would otherwise always trail behind a still-moving drag target, reading
+   as the dart not following the selection at all. */
+.dd-dart.dd-dart--dragging {
+  transition: none;
+}
+
 /* The preview dart follows the cursor with zero lag -- it's the "you are
    currently aiming here" indicator before a throw is committed. */
 .dd-dart--preview {
@@ -969,21 +966,199 @@ input:focus-visible {
 }
 
 .dd-dart--thrown {
-  animation: dd-dart-throw 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: dd-dart-fly-in 520ms cubic-bezier(0.16, 0.84, 0.24, 1);
 }
 
-@keyframes dd-dart-throw {
+/* A genuine "thrown from a hand, arcs in, overshoots slightly, settles"
+   motion -- built from offsets RELATIVE to the dart's own resting anchor
+   (-50%, -100%), so it works correctly no matter where on the chart the
+   dart actually lands. */
+@keyframes dd-dart-fly-in {
   0% {
-    transform: translate(-50%, -50%) scale(0.4) rotate(-25deg);
-    opacity: 0.4;
+    transform: translate(calc(-50% + 160px), calc(-100% + 100px)) rotate(-65deg) scale(0.5);
+    opacity: 0.2;
   }
-  60% {
-    transform: translate(-50%, -50%) scale(1.25) rotate(6deg);
+  45% {
+    transform: translate(calc(-50% - 10px), calc(-100% - 18px)) rotate(15deg) scale(1.2);
+    opacity: 1;
+  }
+  68% {
+    transform: translate(-50%, -100%) rotate(-6deg) scale(0.94);
+  }
+  84% {
+    transform: translate(-50%, -100%) rotate(2.5deg) scale(1.04);
+  }
+  100% {
+    transform: translate(-50%, -100%) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Ground shadow: starts small/faint (dart "high in the air"), grows and
+   sharpens as the dart descends and lands -- reads as real depth rather
+   than a flat pop-in. Anchored at the actual landing spot, unlike the
+   dart icon itself which is mid-flight above it. */
+.dd-dart-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 16px;
+  height: 5px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 72%);
+  animation: dd-dart-shadow-land 520ms cubic-bezier(0.16, 0.84, 0.24, 1);
+  pointer-events: none;
+}
+
+@keyframes dd-dart-shadow-land {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.15;
+  }
+  45% {
+    transform: scale(0.55);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hand shown gripping the dart while the slider is being dragged --
+   lives on the dart itself (rendered by the chart), not the slider,
+   since that's where the dart actually is. */
+.dd-hand-on-dart {
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
+  animation: dd-hand-grip 480ms ease-in-out infinite alternate;
+  transform-origin: 50% 80%;
+}
+
+@keyframes dd-hand-grip {
+  from {
+    transform: rotate(-4deg) scale(1);
+  }
+  to {
+    transform: rotate(3deg) scale(1.05);
+  }
+}
+
+/* The throwing hand rides along with the dart's own fly-in animation (it's
+   a child of the same transformed .dd-dart element) and then releases --
+   fading out over the same 520ms span as dd-dart-fly-in below, so by the
+   time the dart has settled the hand has already let go instead of just
+   sitting there or popping out abruptly. */
+.dd-hand-on-dart--throwing {
+  animation:
+    dd-hand-grip 480ms ease-in-out infinite alternate,
+    dd-throwing-hand-release 520ms ease-out forwards;
+}
+
+@keyframes dd-throwing-hand-release {
+  0%,
+  55% {
     opacity: 1;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
-    opacity: 1;
+    opacity: 0;
+  }
+}
+
+.dd-throw-trail-path {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: dd-throw-trail-draw 320ms ease-out forwards;
+}
+
+@keyframes dd-throw-trail-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.dd-impact-flash {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  margin-bottom: -15px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-secondary);
+  animation: dd-impact-flash 420ms ease-out 200ms both;
+  pointer-events: none;
+}
+
+@keyframes dd-impact-flash {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* A plain small dot for flagged points and post-reveal outcome markers --
+   positioned via the same overlay percentage system as the dart, never
+   via Recharts, so the chart's rendered size never shifts based on how
+   many markers are showing. */
+.dd-marker-dot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* The revealed answer: a soft pulsing target zone rather than a tiny
+   ring, so "this whole area counts, closer to the center is better"
+   reads clearly even to someone who's never used the game before. */
+.dd-pulse-target {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.dd-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  border: 2px solid var(--success);
+  animation: dd-pulse-out 1800ms ease-out infinite;
+}
+
+.dd-pulse-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+@keyframes dd-pulse-out {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
   }
 }
 

@@ -18,7 +18,7 @@
  * than only ever measuring how many days off the flag was.
  */
 
-const RADIUS = 6; // index units (~days) — how far from the true point still earns partial credit
+const RADIUS = 10; // index units (~days) — how far from the true point still earns partial credit
 const MAX_ACCURACY_POINTS = 100;
 const SPEED_BONUS_MAX = 30;
 const FALSE_ALARM_PENALTY = 4; // per flag that doesn't earn credit for any anomaly
