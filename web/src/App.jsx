@@ -1,43 +1,57 @@
 import { useState } from 'react';
-import HomeScreen from './components/HomeScreen.jsx';
-import AnomalyHuntGame from './components/AnomalyHuntGame.jsx';
-import ForecastCallGame from './components/ForecastCallGame.jsx';
-import ProfileScreen from './components/ProfileScreen.jsx';
-import HistoryScreen from './components/HistoryScreen.jsx';
-import DailyChallengeGame from './components/DailyChallengeGame.jsx';
-import ImportDataScreen from './components/ImportDataScreen.jsx';
+import { AnimatePresence, motion } from 'motion/react';
+import HomeScreen from './screens/Home/index.jsx';
+import AnomalyHuntScreen from './screens/AnomalyHunt/index.jsx';
+import ForecastCallScreen from './screens/ForecastCall/index.jsx';
+import DailyChallengeScreen from './screens/DailyChallenge/index.jsx';
+import ProfileScreen from './screens/Profile/index.jsx';
+import HistoryScreen from './screens/History/index.jsx';
+import ImportScreen from './screens/Import/index.jsx';
+import { generateCaseFromSeries } from './engine/case.js';
+
+const SCREENS = {
+  home: HomeScreen,
+  anomaly_hunt: AnomalyHuntScreen,
+  forecast_call: ForecastCallScreen,
+  daily_challenge: DailyChallengeScreen,
+  profile: ProfileScreen,
+  history: HistoryScreen,
+  import: ImportScreen,
+};
 
 export default function App() {
-  const [mode, setMode] = useState(null); // null | 'anomaly_hunt' | 'forecast_call' | 'profile' | 'history' | 'daily_challenge' | 'import'
-  const [customImport, setCustomImport] = useState(null); // { series, unit } | null
+  const [mode, setMode] = useState('home');
+  const [importedCase, setImportedCase] = useState(null);
 
   function handleImported(series, unit) {
-    setCustomImport({ series, unit });
+    setImportedCase(generateCaseFromSeries(series, unit, 'medium', 'Custom Data Investigation'));
     setMode('anomaly_hunt');
   }
 
   function exitAnomalyHunt() {
-    setCustomImport(null); // next visit to Anomaly Hunt goes back to generated data
-    setMode(null);
+    setImportedCase(null);
+    setMode('home');
   }
 
-  if (mode === 'anomaly_hunt') {
-    return <AnomalyHuntGame onExit={exitAnomalyHunt} customImport={customImport} />;
-  }
-  if (mode === 'forecast_call') {
-    return <ForecastCallGame onExit={() => setMode(null)} />;
-  }
-  if (mode === 'daily_challenge') {
-    return <DailyChallengeGame onExit={() => setMode(null)} />;
-  }
-  if (mode === 'profile') {
-    return <ProfileScreen onExit={() => setMode(null)} />;
-  }
-  if (mode === 'history') {
-    return <HistoryScreen onExit={() => setMode(null)} />;
-  }
-  if (mode === 'import') {
-    return <ImportDataScreen onImported={handleImported} onExit={() => setMode(null)} />;
-  }
-  return <HomeScreen onSelectMode={setMode} />;
+  const Screen = SCREENS[mode] ?? HomeScreen;
+  const props =
+    mode === 'home'
+      ? { onSelectMode: setMode }
+      : mode === 'anomaly_hunt'
+        ? { onExit: exitAnomalyHunt, importedCase }
+        : mode === 'import'
+          ? { onImported: handleImported, onExit: () => setMode('home') }
+          : { onExit: () => setMode('home') };
+
+  return (
+    <>
+      <div className="ambient-glow" />
+      <div className="ambient-grain" />
+      <AnimatePresence mode="wait">
+        <motion.div key={mode} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <Screen {...props} />
+        </motion.div>
+      </AnimatePresence>
+    </>
+  );
 }

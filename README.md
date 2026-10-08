@@ -14,7 +14,7 @@ look the same.
 ## Three investigations, one engine
 
 All three modes are built on the same procedurally-generated
-business-metric library (`web/src/game-logic/businessMetrics.js`) — seven
+business-metric library (`web/src/engine/metrics.js`) — seven
 metric templates (revenue, active users, support tickets, defect rate,
 response time, ad ROAS, churn rate), each randomized every time, so the
 underlying data engine is shared rather than duplicated per mode.
@@ -48,7 +48,7 @@ plays that day — the calendar date itself is the random seed, so no
 backend or server-assigned puzzle is needed. One attempt per local day.
 
 ### Progression
-A lightweight local rank system (`web/src/game-logic/profile.js`) tracks
+A lightweight local rank system (`web/src/engine/profile.js`) tracks
 lifetime points across all three modes and shows an "investigator rank"
 on the home screen (Rookie Investigator → Master Detective), plus real
 derived statistics (accuracy, false alarm rate, a "statistical
@@ -82,8 +82,8 @@ never risk accidentally racking up flags.
 ## How it works
 
 1. **Data generation** — happens entirely client-side, no backend, no
-   pre-built files. Each mode's generator (`anomalyGenerator.js` /
-   `forecastGenerator.js` / `dailyChallenge.js`) picks a random template,
+   pre-built files. Each mode's generator (`anomalies.js` /
+   `forecast.js` / `daily.js`) picks a random template,
    randomizes its parameters, and (for Anomaly Hunt) injects labeled
    anomalies.
 2. **Distance-based scoring in Anomaly Hunt, confidence-calibrated
@@ -112,33 +112,26 @@ anomaly-hunt/
 │   ├── detect_anomalies.py             # includes full STL decomposition via statsmodels
 │   └── build_levels.py
 ├── web/                                 # the game — fully self-contained
-│   ├── src/game-logic/
-│   │   ├── businessMetrics.js          # shared: RNG, templates, formatting -- used by all 3 modes
-│   │   ├── anomalyGenerator.js         # Anomaly Hunt: injects labeled anomalies
-│   │   ├── forecastGenerator.js        # Forecast Call: builds the MCQ + distractors
-│   │   ├── forecastScoring.js          # Forecast Call: confidence-calibrated scoring
-│   │   ├── dailyChallenge.js           # date-seeded deterministic daily case
-│   │   ├── scoring.js                  # Anomaly Hunt distance-based scoring + flag cap
-│   │   ├── detectClient.js             # z-score / IQR / weekly-diff detectors
-│   │   ├── chartTheme.js               # shared chart color constants
-│   │   ├── leaderboard.js              # localStorage leaderboard, per mode
-│   │   ├── profile.js                  # lifetime points, rank, derived stats
-│   │   ├── history.js                  # per-case investigation history log
-│   │   ├── resetData.js                # wipes all local game data
-│   │   └── useCountUp.js               # animated score count-up hook
-│   ├── src/components/
-│   │   ├── HomeScreen.jsx              # mode selection, rank badge, daily card
-│   │   ├── AnomalyHuntGame.jsx         # full Anomaly Hunt game loop
-│   │   ├── ForecastCallGame.jsx        # full Forecast Call game loop
-│   │   ├── DailyChallengeGame.jsx      # full Daily Challenge game loop
-│   │   ├── ChartLevel.jsx              # Anomaly Hunt's chart (click-to-focus, layered reveal)
-│   │   ├── ForecastChart.jsx           # Forecast Call's chart (cutoff + reveal)
-│   │   ├── ObservationPanel.jsx        # focused-day panel, prev/next nav, day slider, flagged list
-│   │   ├── DataTable.jsx               # alternate unambiguous row-based selection
-│   │   ├── ScoreBoard.jsx / HintPanel.jsx
-│   │   ├── ProfileScreen.jsx / HistoryScreen.jsx
-│   │   └── ConfettiBurst.jsx           # lightweight celebratory burst, no dependency
-│   └── src/App.jsx                     # thin router between home and the three modes
+│   ├── src/engine/                     # the game's logic, zero UI code
+│   │   ├── rng.js                      # seedable PRNG + Gaussian sampler
+│   │   ├── metrics.js                  # business-metric templates, formatting, unit floors
+│   │   ├── anomalies.js                # injects labeled anomalies (spaced to avoid double credit)
+│   │   ├── detectors.js                # z-score / IQR / weekly-diff, self-exclusion built in
+│   │   ├── scoring.js                  # Anomaly Hunt distance-based + Forecast confidence scoring
+│   │   ├── case.js / daily.js          # builds a round; date-seeded deterministic daily case
+│   │   ├── forecast.js                 # Forecast Call: builds the MCQ + distractors
+│   │   ├── dataImport.js               # parses an imported CSV/JSON series
+│   │   └── profile.js / leaderboard.js / history.js   # localStorage persistence
+│   ├── src/charts/                     # hand-rolled d3-scale/d3-shape charts, no chart library
+│   │   ├── useChartScales.js           # the ONE exact-domain scale every marker shares
+│   │   ├── AnomalyChart.jsx            # drag-to-throw dart, reveal layers, detector overlay
+│   │   ├── ForecastChart.jsx           # cutoff + reveal
+│   │   └── ChartGrid.jsx / SeriesPath.jsx
+│   ├── src/components/                 # the shared design-system pieces (Button, Card, Pill, …)
+│   ├── src/screens/                    # one folder per screen: Home, AnomalyHunt, ForecastCall,
+│   │                                    #   DailyChallenge, Profile, History, Import
+│   ├── src/design/                     # tokens.css, animations.css, chartColors.js
+│   └── src/App.jsx                     # thin router + page-transition shell
 ├── docs/methodology.md                 # statistical reasoning behind all three modes
 ├── .github/workflows/deploy.yml        # auto-deploys to GitHub Pages on push
 ├── start.sh / start.bat                # one-command local run (installs + starts dev server)

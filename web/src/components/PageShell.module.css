@@ -1,0 +1,77 @@
+.shell {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px var(--gutter) 80px;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .shell {
+    max-width: var(--container-max);
+  }
+}
+
+.wide {
+  max-width: 880px;
+}
+
+@media (min-width: 1024px) {
+  .wide {
+    max-width: 1040px;
+  }
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.backLink {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: color var(--duration-fast) ease;
+}
+
+.backLink:hover {
+  color: var(--accent-2);
+}
+
+.right {
+  font-size: 13px;
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .shell {
+    padding: 24px 16px 60px;
+  }
+}

@@ -1,0 +1,52 @@
+.container {
+  position: relative;
+  width: 100%;
+  height: 390px;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    height: 470px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .container {
+    height: 530px;
+  }
+}
+
+.svg {
+  display: block;
+  user-select: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.dartPreview {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.dartLayer {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dartAnchor {
+  transform: translate(-50%, -100%);
+}
+
+.pulseRing {
+  animation: dd-pulse-ring 1800ms ease-out infinite;
+  /* Without fill-box, transform-origin on an SVG shape resolves against
+     the SVG viewport, not the circle's own geometry -- "center" would
+     pulse from the chart's corner instead of the circle's own center. */
+  transform-box: fill-box;
+  transform-origin: center;
+}

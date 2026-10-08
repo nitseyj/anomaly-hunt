@@ -1,0 +1,31 @@
+/* Shared keyframes used by chart primitives and components. */
+
+@keyframes dd-draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes dd-pulse-ring {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes dd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

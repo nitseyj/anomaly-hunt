@@ -1,0 +1,23 @@
+.input {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: inherit;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.input::placeholder {
+  color: var(--ink-faint);
+}
+
+.input:hover {
+  background: var(--surface-3);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

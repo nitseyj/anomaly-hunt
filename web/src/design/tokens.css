@@ -1,0 +1,138 @@
+/* ------------------------------------------------------------------
+   Design tokens -- the single source every CSS Module reads from.
+   A dark field-investigations aesthetic: one accent, a consistent cool
+   navy neutral family, tinted glow instead of flat black shadow, a
+   technical display face for headlines and tabular mono for data.
+   ------------------------------------------------------------------ */
+
+:root {
+  --bg: #07090f;
+  --surface: #10141f;
+  --surface-2: #161b29;
+  --surface-3: #1d2436;
+  --border: #232a3d;
+  --border-strong: #333c54;
+
+  --ink: #f5f7fb;
+  --ink-muted: #8b93aa;
+  --ink-faint: #5c6478;
+
+  --accent: #4f7cff;
+  --accent-2: #7b9bff;
+  --accent-secondary: #00d4ff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(79, 124, 255, 0.14);
+  --accent-glow: rgba(79, 124, 255, 0.4);
+
+  --success: #25d695;
+  --success-soft: rgba(37, 214, 149, 0.14);
+  --danger: #ff5c6c;
+  --danger-soft: rgba(255, 92, 108, 0.14);
+  --warning: #ffb547;
+  --warning-soft: rgba(255, 181, 71, 0.14);
+
+  --detector-zscore: #00d4ff;
+  --detector-iqr: #ffb547;
+  --detector-seasonal: #b78cff;
+
+  --radius-sm: 7px;
+  --radius: 12px;
+  --radius-lg: 18px;
+
+  --font-display: 'Space Grotesk', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
+
+  --gutter: 24px;
+  --container-max: 1160px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+  margin: 0;
+}
+
+p {
+  text-wrap: pretty;
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Ambient depth: an off-center glow plus a near-invisible grain overlay,
+   so the background reads as a textured surface instead of a flat fill. */
+.ambient-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: radial-gradient(900px 560px at 86% -8%, rgba(79, 124, 255, 0.13), transparent 60%),
+    radial-gradient(760px 480px at -6% 104%, rgba(0, 212, 255, 0.07), transparent 60%);
+}
+
+.ambient-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}

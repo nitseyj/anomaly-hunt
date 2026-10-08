@@ -35,7 +35,7 @@ accelerating trend afterward.
 Three classic, transparent statistical methods are used — deliberately
 not deep learning, because the point of this project is to teach the
 *reasoning*, not to chase state-of-the-art accuracy. The live game runs
-a JavaScript version of each (`web/src/game-logic/detectClient.js`); the
+a JavaScript version of each (`web/src/engine/detectors.js`); the
 Python reference implementation (`data-pipeline/detect_anomalies.py`)
 includes a fuller version of the third method:
 
@@ -69,7 +69,7 @@ than any single "correct" answer would be.
 
 ## Detector evaluation: event-based recall
 
-`evaluateDetector()` (`web/src/game-logic/detectClient.js`) scores both the
+`evaluateFlags()` (`web/src/engine/detectors.js`) scores both the
 statistical detectors and the player's own flags — this is what powers
 the "Human vs Machine" comparison table. Recall is computed **per
 anomaly event**, not per index inside the tolerance window: an anomaly
@@ -90,12 +90,12 @@ style.
 ## Scoring definition
 
 Scoring is **distance-based, not exact-match**. Every true anomaly has a
-credit radius (`CREDIT_RADIUS`, currently 6 index-units, in
-`web/src/game-logic/scoring.js`) around it:
+credit radius (`CREDIT_RADIUS`, currently 10 index-units, in
+`web/src/engine/scoring.js`) around it:
 
 - A flag exactly on the anomaly earns full credit for that anomaly.
 - A flag within the radius earns credit that fades linearly with
-  distance — a flag 3 days off (half the radius) earns half credit.
+  distance — a flag 5 days off (half the radius) earns half credit.
 - A flag outside every anomaly's radius earns nothing and counts as a
   false alarm, applying a small penalty.
 - Only the *closest* flag counts toward each anomaly, so clicking
@@ -130,7 +130,7 @@ value and no warning.
 
 Forecast Call doesn't ask for a free-text prediction — it's a multiple-
 choice question, and every part of it is computed from the actual
-generated series, never hard-coded (`web/src/game-logic/forecastGenerator.js`):
+generated series, never hard-coded (`web/src/engine/forecast.js`):
 
 - **Five question types**, one picked at random each round: direction
   (strong increase / moderate increase / stable / decline), a numeric
@@ -145,12 +145,12 @@ generated series, never hard-coded (`web/src/game-logic/forecastGenerator.js`):
 - This was verified directly, not just asserted: 2,000 generated rounds
   were independently re-scored against the same real data and matched
   the "correct" answer in every single case (0 mismatches) — see the
-  commit history around `forecastGenerator.js` for that test.
+  commit history around `forecast.js` for that test.
 
 ## Forecast Call: confidence-calibrated scoring
 
 Before locking in an answer, the player declares Low/Medium/High
-confidence (`web/src/game-logic/forecastScoring.js`). This isn't
+confidence (`web/src/engine/scoring.js`). This isn't
 decorative — it multiplies **both** the reward for being right and the
 penalty for being wrong:
 
@@ -174,13 +174,13 @@ analytical judgement the way it might for spotting an obvious outlier.
 ## Extending this project
 
 - Add a new anomaly type (e.g. seasonal amplitude change) by extending
-  `web/src/game-logic/anomalyGenerator.js` (and its Python counterpart,
+  `web/src/engine/anomalies.js` (and its Python counterpart,
   `data-pipeline/inject_anomalies.py`, if you want it in the reference
   implementation too)
-- Add a new business-metric template to `businessMetrics.js`'s
+- Add a new business-metric template to `metrics.js`'s
   `TEMPLATES` array — both game modes pick it up automatically
-- Add a new detection method by extending `detectClient.js`
+- Add a new detection method by extending `detectors.js`
   (JS, used live) or `detect_anomalies.py` (Python, reference)
 - Add a new game mode by writing a new generator alongside
-  `anomalyGenerator.js` / `forecastGenerator.js` that reuses
-  `businessMetrics.js`'s `pickTemplate()` and `TEMPLATES`
+  `anomalies.js` / `forecast.js` that reuses
+  `metrics.js`'s `pickTemplate()` and `TEMPLATES`
