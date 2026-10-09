@@ -1,16 +1,12 @@
 /**
  * detectors.js
  *
- * Three transparent, classic anomaly-detection methods -- not deep
- * learning, because the point is to teach the reasoning, not chase
- * state-of-the-art accuracy. Powers the post-round "what a statistical
- * model would have flagged" comparison.
- *
- * Every rolling method here excludes the point under test from its own
- * baseline window. Including it is a well-known bias: on a small window,
- * one strong outlier pulls the window's own mean toward itself and
- * inflates its own std, which can push an obvious spike's z-score BELOW
- * threshold purely because it was allowed to vouch for its own normalcy.
+ * Three transparent, classic anomaly-detection methods. Every rolling
+ * method excludes the point under test from its own baseline window --
+ * including it is a well-known bias: on a small window, one strong
+ * outlier pulls the window's own mean toward itself and inflates its own
+ * std, which can push an obvious spike's z-score BELOW threshold purely
+ * because it was allowed to vouch for its own normalcy.
  */
 
 function mean(arr) {
@@ -67,15 +63,13 @@ export function weeklySeasonalDiffDetect(values, threshold = 2.5) {
 
 /**
  * Precision/recall/F1 against ground truth, with a tolerance window.
- * Recall is computed PER ANOMALY EVENT, not per index inside the
- * tolerance window: an anomaly counts as found if at least one flag
- * lands anywhere in its window, regardless of how many nearby points
- * also got flagged. An index-level recall would structurally cap a
- * perfect human player's recall near 15-30% (detectors flag several
- * contiguous points per anomaly; a single click naturally flags one),
- * making Human-vs-Machine unfair by construction rather than a genuine
- * comparison. Precision stays point-based -- it should penalize excess
- * clicking regardless of interaction style.
+ * Recall is computed PER ANOMALY EVENT: an anomaly counts as found if at
+ * least one flag lands anywhere in its tolerance window, regardless of
+ * how many nearby points also got flagged. An index-level recall would
+ * structurally cap a perfect human player's recall near 15-30% (detectors
+ * flag several contiguous points per anomaly; a single click naturally
+ * flags one), making Human-vs-Machine unfair by construction. Precision
+ * stays point-based -- it should penalize excess clicking either way.
  */
 export function evaluateFlags(flags, groundTruthAnomalies, tolerance = 3) {
   const inToleranceOfAny = new Set();
@@ -91,9 +85,7 @@ export function evaluateFlags(flags, groundTruthAnomalies, tolerance = 3) {
     else fp += 1;
   }
 
-  const anomaliesFound = groundTruthAnomalies.filter((a) =>
-    flaggedIdxs.some((idx) => Math.abs(idx - a.index) <= tolerance)
-  ).length;
+  const anomaliesFound = groundTruthAnomalies.filter((a) => flaggedIdxs.some((idx) => Math.abs(idx - a.index) <= tolerance)).length;
 
   const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
   const recall = groundTruthAnomalies.length > 0 ? anomaliesFound / groundTruthAnomalies.length : 0;
@@ -118,12 +110,10 @@ export function runAllDetectors(values, groundTruthAnomalies) {
   for (const [name, flags] of Object.entries(flagsByDetector)) {
     scores[name] = evaluateFlags(flags, groundTruthAnomalies);
   }
-
   const n = values.length;
   const combinedFlags = Array.from({ length: n }, (_, i) => {
     const votes = Object.values(flagsByDetector).filter((flags) => flags[i]).length;
     return votes >= 2;
   });
-
   return { scores, flagsByDetector, combinedFlags };
 }

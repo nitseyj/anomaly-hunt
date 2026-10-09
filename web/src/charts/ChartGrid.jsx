@@ -1,60 +1,33 @@
-import { CHART_COLORS } from '../design/chartColors.js';
+/**
+ * ChartGrid.jsx
+ *
+ * Y-axis gridlines + labels, and a sparse X-axis date label row. Ticks
+ * come from d3-scale's `.ticks()`, which only picks clean values -- it
+ * never touches the scale's own domain, so this can't reintroduce the
+ * padding-mismatch bug useChartScales.js exists to avoid.
+ */
+import styles from './ChartGrid.module.css';
 
-/** Horizontal dashed gridlines at each Y tick, plus the left/bottom axis
- * lines. Ticks come from the SAME scale the series/markers use, so a
- * gridline and the data point that touches it are never a px off. */
-export function ChartGrid({ width, height, scales }) {
+export function ChartGrid({ xScale, yScale, series, width, height, unit, formatValue, tickCount = 5 }) {
+  const yTicks = yScale.ticks(tickCount);
+  const n = series.length;
+  const xTickIndices = [0, Math.floor((n - 1) * 0.25), Math.floor((n - 1) * 0.5), Math.floor((n - 1) * 0.75), n - 1];
+
   return (
-    <g>
-      {scales.yTicks.map((t) => (
-        <line
-          key={t}
-          x1={0}
-          x2={width}
-          y1={scales.y(t)}
-          y2={scales.y(t)}
-          stroke={CHART_COLORS.grid}
-          strokeDasharray="3 3"
-        />
+    <g className={styles.grid}>
+      {yTicks.map((t) => (
+        <g key={t} className={styles.yTick}>
+          <line x1={xScale.range()[0]} x2={xScale.range()[1]} y1={yScale(t)} y2={yScale(t)} className={styles.gridLine} />
+          <text x={xScale.range()[0] - 8} y={yScale(t)} className={styles.yLabel}>
+            {formatValue ? formatValue(t, unit) : t}
+          </text>
+        </g>
       ))}
-    </g>
-  );
-}
-
-export function AxisY({ scales, formatValue, width }) {
-  return (
-    <g>
-      {scales.yTicks.map((t) => (
-        <text
-          key={t}
-          x={-10}
-          y={scales.y(t)}
-          dy="0.32em"
-          textAnchor="end"
-          fontSize={11}
-          fontFamily="var(--font-mono)"
-          fill={CHART_COLORS.axisText}
-        >
-          {formatValue(t)}
+      {xTickIndices.map((idx) => (
+        <text key={idx} x={xScale(idx)} y={height - 4} className={styles.xLabel} textAnchor="middle">
+          {series[idx]?.date?.slice(5) ?? ''}
         </text>
       ))}
-    </g>
-  );
-}
-
-export function AxisX({ series, scales, height }) {
-  const n = series.length;
-  const interval = Math.max(1, Math.ceil(n / 6));
-  return (
-    <g>
-      <line x1={0} x2={scales.x(n - 1)} y1={height} y2={height} stroke={CHART_COLORS.axisLine} />
-      {series.map((p, i) =>
-        i % interval === 0 ? (
-          <text key={i} x={scales.x(i)} y={height + 18} textAnchor="middle" fontSize={11} fill={CHART_COLORS.axisText}>
-            {p.date}
-          </text>
-        ) : null
-      )}
     </g>
   );
 }

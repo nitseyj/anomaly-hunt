@@ -1,164 +1,191 @@
 /**
  * forecast.js
  *
- * Builds one Forecast Call round: a clean trend+seasonality series with
- * the final stretch hidden, plus a dynamically-generated multiple-choice
- * question. Every option -- correct answer and distractors -- is computed
- * from the actual series, never hard-coded.
+ * Forecast Call: show a trend with the ending hidden, ask one multiple-
+ * choice question about what happens next. Every option is computed from
+ * the real held-out data, not flavor text -- the correct answer and all
+ * distractors are genuine numbers derived from the series.
  */
-import { createRng, randomSeed } from './rng.js';
-import { pickTemplate, formatValue, SERIES_LENGTH } from './metrics.js';
+import { formatValue } from './metrics.js';
 
-const HIDDEN_DAYS = 14;
-const RECENT_WINDOW = 14;
-const QUESTION_TYPES = ['direction', 'range', 'magnitude', 'pattern', 'business'];
-const UNIT_BAND_FLOOR = { usd: 50, count: 5, percent: 0.3, ms: 5, roas: 0.1 };
+export const FORECAST_QUESTION_TYPES = ['direction', 'range', 'magnitude', 'pattern', 'business'];
+const VISIBLE_FRACTION = 0.7;
 
-const round2 = (v) => Math.round(v * 100) / 100;
-const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
-
-function pctChangeOf(recentAvg, futureAvg) {
-  const denom = Math.max(Math.abs(recentAvg), 1e-9);
-  return ((futureAvg - recentAvg) / denom) * 100;
+function mean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function classifyDirection(pctChange) {
-  if (pctChange > 8) return 0; // strong increase
-  if (pctChange > 2) return 1; // moderate increase
-  if (pctChange >= -2) return 2; // stable
-  return 3; // decline
+function round2(v) {
+  return Math.round(v * 100) / 100;
 }
 
-function classifyMagnitude(absPctChange) {
-  if (absPctChange < 2) return 0;
-  if (absPctChange < 5) return 1;
-  if (absPctChange < 10) return 2;
-  return 3;
+function shuffle(arr, rng) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
-function classifyPattern(pctChange, hasWeeklySeasonality) {
-  if (hasWeeklySeasonality) return 2; // seasonal oscillation dominates what's visually obvious
-  if (pctChange > 4) return 0;
-  if (pctChange < -4) return 3;
-  return 1;
+function splitSeries(series) {
+  const cut = Math.floor(series.length * VISIBLE_FRACTION);
+  return { visible: series.slice(0, cut), hidden: series.slice(cut), cut };
 }
 
-/**
- * Four sequential bands centered on futureAvg, with the correct slot's
- * position randomized each round. Near a metric's natural floor, a
- * full-width ladder can push early slots negative -- clamping each
- * edge independently (the naive approach) collapses those into
- * duplicate/zero-width "0%-0%" options, and can even silently move
- * futureAvg into a DIFFERENT slot than the one marked correct. Shrinking
- * the band width instead keeps all 4 slots distinct and keeps futureAvg
- * exactly centered in the slot reported as correct.
- */
-function buildRangeQuestion(rng, unit, futureAvg) {
-  let width = Math.max(Math.abs(futureAvg) * 0.1, UNIT_BAND_FLOOR[unit] ?? 1);
-  const correctSlot = Math.floor(rng() * 4);
-  const maxWidthKeepingNonNegative = futureAvg / (correctSlot + 0.5);
-  if (maxWidthKeepingNonNegative > 0 && maxWidthKeepingNonNegative < width) {
-    width = maxWidthKeepingNonNegative;
-  }
-  const start = futureAvg - width * (correctSlot + 0.5);
-  const bands = [0, 1, 2, 3].map((i) => ({
-    low: Math.max(0, start + i * width),
-    high: Math.max(0, start + (i + 1) * width),
-  }));
-  return {
-    options: bands.map((b) => `${formatValue(round2(b.low), unit)} – ${formatValue(round2(b.high), unit)}`),
-    correctIndex: correctSlot,
-  };
-}
-
-function buildQuestion(type, rng, { label, unit, futureAvg, pctChange, hasWeeklySeasonality }) {
-  const absPctChange = Math.abs(pctChange);
-
-  if (type === 'direction') {
-    return {
-      type,
-      question: `What is the most likely direction of ${label.toLowerCase()} over the next ${HIDDEN_DAYS} days?`,
-      options: ['Strong increase', 'Moderate increase', 'Stable', 'Decline'],
-      correctIndex: classifyDirection(pctChange),
-    };
-  }
-  if (type === 'range') {
-    const { options, correctIndex } = buildRangeQuestion(rng, unit, futureAvg);
-    return { type, question: `Which range is most likely for the ${HIDDEN_DAYS}-day average of ${label.toLowerCase()}?`, options, correctIndex };
-  }
-  if (type === 'magnitude') {
-    return {
-      type,
-      question: `Approximately how much will ${label.toLowerCase()} change over the next ${HIDDEN_DAYS} days?`,
-      options: ['Less than 2%', '2–5%', '5–10%', 'More than 10%'],
-      correctIndex: classifyMagnitude(absPctChange),
-    };
-  }
-  if (type === 'pattern') {
-    return {
-      type,
-      question: `Which pattern is most likely over the next ${HIDDEN_DAYS} days?`,
-      options: ['Continued growth', 'Stable movement', 'Seasonal oscillation', 'Decline'],
-      correctIndex: classifyPattern(pctChange, hasWeeklySeasonality),
-    };
-  }
-  return {
-    type,
-    question: `Based on recent behaviour, what is the most reasonable expectation for ${label.toLowerCase()}?`,
-    options: [
-      'Continue accelerating well above recent norms',
-      'Grow modestly, in line with recent momentum',
-      'Hold roughly steady around current levels',
-      'Pull back from where it has been',
+function buildDirectionQuestion(visible, hidden, unit, rng) {
+  const lastVisible = visible[visible.length - 1].value;
+  const lastHidden = hidden[hidden.length - 1].value;
+  const delta = lastHidden - lastVisible;
+  const correct = delta > lastVisible * 0.02 ? 'up' : delta < -lastVisible * 0.02 ? 'down' : 'flat';
+  const options = shuffle(
+    [
+      { id: 'up', label: 'Trends up' },
+      { id: 'down', label: 'Trends down' },
+      { id: 'flat', label: 'Stays flat' },
     ],
-    correctIndex: classifyDirection(pctChange),
+    rng
+  );
+  return {
+    type: 'direction',
+    prompt: 'Where does this trend go next?',
+    options,
+    correctId: correct,
   };
 }
 
-function buildExplanation(label, unit, recentAvg, futureAvg, pctChange, hasWeeklySeasonality) {
-  const sign = pctChange >= 0 ? '+' : '';
-  const trend = `${label} moved from an average of ${formatValue(round2(recentAvg), unit)} to ${formatValue(round2(futureAvg), unit)} over the ${HIDDEN_DAYS}-day window (${sign}${pctChange.toFixed(1)}%).`;
-  const seasonality = hasWeeklySeasonality
-    ? ' Recurring weekly seasonality remained a significant factor across the window.'
-    : ' No strong weekly pattern was present, so the move reflects trend and noise alone.';
-  return trend + seasonality;
-}
+function buildRangeQuestion(visible, hidden, unit, rng) {
+  const lastHidden = hidden[hidden.length - 1].value;
+  const visibleValues = visible.map((p) => p.value);
+  const spread = Math.max(...visibleValues) - Math.min(...visibleValues) || Math.abs(mean(visibleValues)) * 0.1 || 1;
+  // Band width floored so it can never collapse to a degenerate zero-width
+  // option near a metric's physical floor (e.g. a defect rate pinned near 0%).
+  const bandWidth = Math.max(spread * 0.35, Math.abs(lastHidden) * 0.08, 0.5);
 
-export function generateForecastRound(usedTemplateIds = []) {
-  const rng = createRng(randomSeed());
-  const { template, scenario } = pickTemplate(rng, usedTemplateIds);
-  const { dates, values } = template.generate(rng, SERIES_LENGTH);
-  const visibleCount = SERIES_LENGTH - HIDDEN_DAYS;
+  const correctLow = lastHidden - bandWidth / 2;
+  const correctHigh = lastHidden + bandWidth / 2;
+  const offset = bandWidth * 1.4;
 
-  const recentAvg = mean(values.slice(visibleCount - RECENT_WINDOW, visibleCount));
-  const futureAvg = mean(values.slice(visibleCount));
-  const pctChange = pctChangeOf(recentAvg, futureAvg);
+  const bands = [
+    { id: 'correct', low: correctLow, high: correctHigh },
+    { id: 'above', low: correctHigh + offset * 0.2, high: correctHigh + offset * 1.2 },
+    { id: 'below', low: correctLow - offset * 1.2, high: correctLow - offset * 0.2 },
+  ];
 
-  const questionType = QUESTION_TYPES[Math.floor(rng() * QUESTION_TYPES.length)];
-  const mcq = buildQuestion(questionType, rng, {
-    label: template.label,
-    unit: template.unit,
-    futureAvg,
-    pctChange,
-    hasWeeklySeasonality: template.hasWeeklySeasonality,
-  });
+  const options = shuffle(
+    bands.map((b) => ({
+      id: b.id,
+      label: `${formatValue(b.low, unit)} – ${formatValue(b.high, unit)}`,
+    })),
+    rng
+  );
 
   return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    templateId: template.id,
-    title: scenario.title,
-    brief: scenario.brief,
-    label: template.label,
-    unit: template.unit,
-    visibleSeries: dates.slice(0, visibleCount).map((date, i) => ({ date, value: round2(values[i]) })),
-    futureSeries: dates.slice(visibleCount).map((date, i) => ({ date, value: round2(values[visibleCount + i]) })),
-    question: mcq.question,
-    options: mcq.options,
-    correctIndex: mcq.correctIndex,
-    questionType: mcq.type,
-    explanation: buildExplanation(template.label, template.unit, recentAvg, futureAvg, pctChange, template.hasWeeklySeasonality),
+    type: 'range',
+    prompt: 'Which range will the final value land in?',
+    options,
+    correctId: 'correct',
   };
 }
 
-export const FORECAST_ROUND_COUNT = 5;
-export const FORECAST_HIDDEN_DAYS = HIDDEN_DAYS;
+function buildMagnitudeQuestion(visible, hidden, unit, rng) {
+  const lastVisible = visible[visible.length - 1].value;
+  const lastHidden = hidden[hidden.length - 1].value;
+  const pctChange = lastVisible !== 0 ? ((lastHidden - lastVisible) / Math.abs(lastVisible)) * 100 : 0;
+  const absPct = Math.abs(pctChange);
+  const correct = absPct < 5 ? 'small' : absPct < 20 ? 'moderate' : 'large';
+  const options = shuffle(
+    [
+      { id: 'small', label: 'Small move (< 5%)' },
+      { id: 'moderate', label: 'Moderate move (5-20%)' },
+      { id: 'large', label: 'Large move (> 20%)' },
+    ],
+    rng
+  );
+  return {
+    type: 'magnitude',
+    prompt: 'How big is the move by the end?',
+    options,
+    correctId: correct,
+  };
+}
+
+function buildPatternQuestion(visible, hidden, unit, rng) {
+  const hiddenValues = hidden.map((p) => p.value);
+  const first = hiddenValues[0];
+  const last = hiddenValues[hiddenValues.length - 1];
+  const maxV = Math.max(...hiddenValues);
+  const minV = Math.min(...hiddenValues);
+  const monotoneUp = hiddenValues.every((v, i) => i === 0 || v >= hiddenValues[i - 1] - (maxV - minV) * 0.05);
+  const monotoneDown = hiddenValues.every((v, i) => i === 0 || v <= hiddenValues[i - 1] + (maxV - minV) * 0.05);
+
+  let correct = 'choppy';
+  if (monotoneUp && last > first) correct = 'steady';
+  else if (monotoneDown && last < first) correct = 'steady';
+  else if (Math.abs(last - first) < (maxV - minV) * 0.25) correct = 'reverts';
+
+  const options = shuffle(
+    [
+      { id: 'steady', label: 'Keeps moving steadily in one direction' },
+      { id: 'reverts', label: 'Swings, then reverts near where it started' },
+      { id: 'choppy', label: 'Stays choppy with no clear direction' },
+    ],
+    rng
+  );
+  return {
+    type: 'pattern',
+    prompt: 'Which pattern best describes what happens next?',
+    options,
+    correctId: correct,
+  };
+}
+
+const LOWER_IS_BETTER = new Set(['defect_rate', 'response_time', 'support_tickets', 'churn_rate']);
+
+function buildBusinessQuestion(visible, hidden, templateId, label, rng) {
+  const lastVisible = visible[visible.length - 1].value;
+  const lastHidden = hidden[hidden.length - 1].value;
+  const delta = lastHidden - lastVisible;
+  const goodDirection = LOWER_IS_BETTER.has(templateId) ? -1 : 1;
+  const correct = delta * goodDirection > lastVisible * 0.02 ? 'improves' : delta * goodDirection < -lastVisible * 0.02 ? 'worsens' : 'holds';
+  const options = shuffle(
+    [
+      { id: 'improves', label: `${label} improves` },
+      { id: 'worsens', label: `${label} worsens` },
+      { id: 'holds', label: `${label} holds steady` },
+    ],
+    rng
+  );
+  return {
+    type: 'business',
+    prompt: `From a business standpoint, what happens to ${label.toLowerCase()}?`,
+    options,
+    correctId: correct,
+  };
+}
+
+const BUILDERS = {
+  direction: buildDirectionQuestion,
+  range: buildRangeQuestion,
+  magnitude: buildMagnitudeQuestion,
+  pattern: buildPatternQuestion,
+};
+
+export function generateForecastRound(caseData, rng) {
+  const { series, unit, label, templateId } = caseData;
+  const { visible, hidden, cut } = splitSeries(series);
+  const type = FORECAST_QUESTION_TYPES[Math.floor(rng() * FORECAST_QUESTION_TYPES.length)];
+
+  const question =
+    type === 'business'
+      ? buildBusinessQuestion(visible, hidden, templateId, label, rng)
+      : BUILDERS[type](visible, hidden, unit, rng);
+
+  return {
+    ...question,
+    visible,
+    hidden,
+    cutIndex: cut,
+    finalValue: round2(hidden[hidden.length - 1].value),
+  };
+}

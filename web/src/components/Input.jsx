@@ -1,9 +1,21 @@
 import styles from './Input.module.css';
 
-export function Input(props) {
-  return <input className={styles.input} {...props} />;
+export function Input({ label, hint, className = '', ...rest }) {
+  return (
+    <label className={styles.wrap}>
+      {label && <span className={styles.label}>{label}</span>}
+      <input className={`${styles.input} ${className}`} {...rest} />
+      {hint && <span className={styles.hint}>{hint}</span>}
+    </label>
+  );
 }
 
-export function Select(props) {
-  return <select className={styles.input} {...props} />;
+export function TextArea({ label, hint, className = '', ...rest }) {
+  return (
+    <label className={styles.wrap}>
+      {label && <span className={styles.label}>{label}</span>}
+      <textarea className={`${styles.input} ${styles.textarea} ${className}`} {...rest} />
+      {hint && <span className={styles.hint}>{hint}</span>}
+    </label>
+  );
 }

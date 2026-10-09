@@ -1,40 +1,33 @@
+/**
+ * useChartScales.js
+ *
+ * Builds x/y scales for a series chart from an EXACT domain -- never
+ * `.nice()`'d. A niced/padded domain was the root cause of a real
+ * marker-misalignment bug: when the axis silently rounds its range to
+ * cleaner numbers, anything computed from the raw data min/max (ground-
+ * truth markers, detector overlays, the drag-to-throw dart) lands at a
+ * different pixel than the line itself, which was drawn against the
+ * padded domain. Every consumer in this app must share THIS scale --
+ * never invent a second one from the same data.
+ */
 import { useMemo } from 'react';
 import { scaleLinear } from 'd3-scale';
 
-/**
- * Builds the x/y scales a chart and every marker drawn on top of it share.
- * This is the structural fix for the bug class the old Recharts-based
- * chart hit repeatedly: the Y domain here is the data's EXACT [min, max]
- * -- `.domain()` is set directly, `.nice()` is never called, so nothing
- * silently pads the range outward to a round number. Any code computing a
- * pixel position from a value, and any code reading a pixel position back
- * to a value, both go through these same two scale functions -- there is
- * no second, independently-computed coordinate system for an overlay to
- * drift out of sync with.
- *
- * `.ticks(5)` is used separately, purely for axis labels -- it reads
- * clean round numbers WITHIN the exact domain without ever touching the
- * domain itself.
- */
-export function useChartScales(series, width, height) {
+export function useChartScales(series, { width, height, padding = 24, yPadFraction = 0.08 }) {
   return useMemo(() => {
     const n = series.length;
     const values = series.map((p) => p.value);
-    const yMin = Math.min(...values);
-    const yMax = Math.max(...values);
-    const yDomain = yMin === yMax ? [yMin - 1, yMax + 1] : [yMin, yMax];
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const span = rawMax - rawMin || Math.abs(rawMax) * 0.1 || 1;
+    const yPad = span * yPadFraction;
 
-    const x = scaleLinear().domain([0, Math.max(1, n - 1)]).range([0, width]);
-    const y = scaleLinear().domain(yDomain).range([height, 0]);
+    const innerWidth = Math.max(width - padding * 2, 1);
+    const innerHeight = Math.max(height - padding * 2, 1);
 
-    const xToIndex = (px) => {
-      const idx = Math.round(x.invert(Math.max(0, Math.min(width, px))));
-      return Math.max(0, Math.min(n - 1, idx));
-    };
-    const yToValue = (py) => y.invert(Math.max(0, Math.min(height, py)));
+    const xScale = scaleLinear().domain([0, n - 1]).range([padding, padding + innerWidth]);
+    const yScale = scaleLinear().domain([rawMin - yPad, rawMax + yPad]).range([padding + innerHeight, padding]);
 
-    const yTicks = yDomain[0] === yDomain[1] ? [yDomain[0]] : y.ticks(5);
-
-    return { x, y, xToIndex, yToValue, yTicks, yDomain };
-  }, [series, width, height]);
+    return { xScale, yScale, innerWidth, innerHeight, padding, domainMin: rawMin - yPad, domainMax: rawMax + yPad };
+  }, [series, width, height, padding, yPadFraction]);
 }

@@ -1,0 +1,73 @@
+.card {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.fileLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.fileLabel:hover {
+  border-color: var(--accent-signal);
+}
+
+.fileInput {
+  display: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: var(--space-4);
+}
+
+.unitPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.unitLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.select {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.error {
+  color: var(--accent-alert);
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

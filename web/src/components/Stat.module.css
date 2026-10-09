@@ -1,43 +1,28 @@
-.row {
-  display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
-  padding: 4px 4px 20px;
-}
-
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .label {
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink-faint);
-  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
 }
 
 .value {
-  font-family: var(--font-mono);
-  font-size: 20px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
-.warn {
-  color: var(--danger);
-  animation: dd-stat-warn-pulse 1100ms ease-in-out infinite;
+.signal {
+  color: var(--accent-signal);
 }
 
-@keyframes dd-stat-warn-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+.alert {
+  color: var(--accent-alert);
 }

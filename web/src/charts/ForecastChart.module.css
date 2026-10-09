@@ -1,0 +1,50 @@
+.wrap {
+  width: 100%;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%);
+  overflow: visible;
+}
+
+.line {
+  stroke: var(--series-line);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(124, 199, 255, 0.3));
+}
+
+.cutoffLine {
+  stroke: var(--accent-signal);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+}
+
+.cutoffLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  fill: var(--accent-signal);
+}
+
+.fogPanel {
+  fill: rgba(5, 7, 12, 0.72);
+  stroke: var(--line-faint);
+}
+
+.sweep {
+  fill: var(--accent-signal);
+  filter: drop-shadow(0 0 16px var(--accent-signal));
+}
+
+.finalDot {
+  fill: var(--accent-signal);
+  stroke: var(--bg-void);
+  stroke-width: 2;
+}

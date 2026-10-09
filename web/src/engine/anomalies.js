@@ -2,10 +2,7 @@
  * anomalies.js
  *
  * Injects 1-3 labeled anomalies into a clean series. Ground truth marks
- * WHERE an anomaly begins, not every point it affects afterward -- a
- * level shift or trend break changes every subsequent value, but the
- * thing a player (or analyst) should flag is the moment it started, not
- * every day it stays changed.
+ * WHERE an anomaly begins, not every point it affects afterward.
  */
 import { CREDIT_RADIUS } from './scoring.js';
 
@@ -31,13 +28,11 @@ function shuffle(arr, rng) {
   return arr;
 }
 
-/**
- * Picks anomaly indices spaced far enough apart (> 2x CREDIT_RADIUS) that
- * no single flag can ever be within radius of two anomalies at once --
- * otherwise one flag could silently double-count credit. Retries several
- * shuffles before falling back to ignoring spacing (only reachable on a
- * pathologically short series).
- */
+/** Spaces anomalies > 2x CREDIT_RADIUS apart so no single flag can ever
+ * be within radius of two anomalies at once (which would silently
+ * double-count credit for one flag). Retries several shuffles before
+ * falling back to ignoring spacing (only reachable on a pathologically
+ * short series). */
 function pickAnomalyIndices(n, count, rng) {
   const minSpacing = Math.max(n * 0.12, CREDIT_RADIUS * 2 + 2);
   const candidateStart = Math.floor(n * 0.15);
@@ -76,11 +71,6 @@ export function injectAnomalies(cleanValues, difficulty, rng) {
     const direction = rng() < 0.5 ? 1 : -1;
     const magnitude = std * settings.magnitudeMult * (0.85 + rng() * 0.3);
 
-    // A downward shift/break sized from the series-wide std can exceed the
-    // LOCAL baseline (especially late in a declining series), flattening a
-    // long stretch at a hard floor once clamped -- cap the downward delta
-    // at a fraction of the local mean so it stays dramatic without ever
-    // fully flattening a run of points.
     const localWindow = out.slice(Math.max(0, idx - 10), idx);
     const localMean = localWindow.length > 0 ? localWindow.reduce((a, b) => a + b, 0) / localWindow.length : out[idx];
     const maxDownwardDelta = Math.abs(localMean) * 0.85;
@@ -98,8 +88,7 @@ export function injectAnomalies(cleanValues, difficulty, rng) {
     } else {
       // trend_break: the flagged point must itself be visibly off, not
       // just where the slope begins to change -- a pure ramp is exactly
-      // zero deviation at i === idx. An immediate step (sized like a
-      // level shift) plus a continuing slope keeps both properties true.
+      // zero deviation at i === idx.
       const immediateStep = magnitude * 0.9;
       const slope = magnitude * 0.08;
       for (let i = idx; i < n; i++) {
@@ -112,10 +101,6 @@ export function injectAnomalies(cleanValues, difficulty, rng) {
     groundTruth.push({ type, index: idx });
   }
 
-  // Multiple anomalies' capped-but-large deltas can still compound toward
-  // a shared floor where their tails overlap -- no point should end up
-  // more than ~85% below its pre-anomaly value, however many anomalies
-  // jointly touch it.
   for (let i = 0; i < n; i++) {
     if (cleanValues[i] > 0 && out[i] < cleanValues[i] * 0.15) {
       out[i] = cleanValues[i] * 0.15;

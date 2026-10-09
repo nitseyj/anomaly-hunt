@@ -1,332 +1,244 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import AnomalyChart from '../../charts/AnomalyChart.jsx';
-import { DaySlider } from '../../components/DaySlider.jsx';
-import { ObservationPanel, FlaggedList } from '../../components/ObservationPanel.jsx';
+import { PageShell } from '../../components/PageShell.jsx';
+import { ObservationPanel } from '../../components/ObservationPanel.jsx';
+import { AnomalyChart } from '../../charts/AnomalyChart.jsx';
+import { Button } from '../../components/Button.jsx';
 import { DataTable } from '../../components/DataTable.jsx';
 import { ResultBreakdown } from '../../components/ResultBreakdown.jsx';
-import { PageShell, TopBar } from '../../components/PageShell.jsx';
-import { Button } from '../../components/Button.jsx';
-import { Card, Panel } from '../../components/Card.jsx';
-import { Pill } from '../../components/Pill.jsx';
-import { Stat, StatRow } from '../../components/Stat.jsx';
+import { StampBadge } from '../../components/StampBadge.jsx';
 import { Confetti } from '../../components/Confetti.jsx';
-import { generateAnomalyCase, DIFFICULTY_SEQUENCE } from '../../engine/case.js';
-import { scoreAnomalyHunt, MAX_FLAGS_PER_CASE, TIME_LIMIT_SECONDS } from '../../engine/scoring.js';
-import { runAllDetectors, evaluateFlags } from '../../engine/detectors.js';
-import { getScores, submitScore } from '../../engine/leaderboard.js';
-import { recordGameResult, recordAnomalyCase } from '../../engine/profile.js';
+import { generateAnomalyCase, generateCaseFromSeries, DIFFICULTY_SEQUENCE } from '../../engine/case.js';
+import { scoreAnomalyHunt, TIME_LIMIT_SECONDS, MAX_FLAGS_PER_CASE } from '../../engine/scoring.js';
+import { runAllDetectors, DETECTOR_META } from '../../engine/detectors.js';
 import { addHistoryEntry } from '../../engine/history.js';
-import { useCountUp } from '../../engine/useCountUp.js';
-import styles from './AnomalyHunt.module.css';
+import styles from './styles.module.css';
 
-const MODE = 'anomaly_hunt';
-const ROUND_COUNT = DIFFICULTY_SEQUENCE.length;
-
-export default function AnomalyHuntScreen({ onExit, importedCase }) {
-  const [roundIdx, setRoundIdx] = useState(0);
-  const [usedTemplates, setUsedTemplates] = useState([]);
-  const [caseFile, setCaseFile] = useState(() => importedCase ?? generateAnomalyCase(DIFFICULTY_SEQUENCE[0], []));
-  const [stage, setStage] = useState('briefing'); // briefing | playing | result
-  const [selectedIndices, setSelectedIndices] = useState(new Set());
-  const [focusedIndex, setFocusedIndex] = useState(null);
-  const [yGuesses, setYGuesses] = useState({});
-  const [showTable, setShowTable] = useState(false);
-  const [secondsRemaining, setSecondsRemaining] = useState(TIME_LIMIT_SECONDS);
+export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = null }) {
+  const [caseIndex, setCaseIndex] = useState(0);
+  const [currentCase, setCurrentCase] = useState(null);
+  const [usedTemplateIds, setUsedTemplateIds] = useState([]);
+  const [flags, setFlags] = useState([]);
+  const [secondsLeft, setSecondsLeft] = useState(TIME_LIMIT_SECONDS);
+  const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState(null);
-  const [detectorResults, setDetectorResults] = useState(null);
-  const [humanScore, setHumanScore] = useState(null);
-  const [totalPoints, setTotalPoints] = useState(0);
-  const [scores, setScores] = useState(getScores(MODE));
-  const [roundHistory, setRoundHistory] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
-  const [layers, setLayers] = useState({ yours: true, actual: true, rolling_zscore: false, rolling_iqr: false, weekly_seasonal_diff: false });
-
+  const [detectorData, setDetectorData] = useState(null);
+  const [caseResults, setCaseResults] = useState([]);
+  const [finished, setFinished] = useState(false);
   const timerRef = useRef(null);
 
-  const atFlagCap = selectedIndices.size >= MAX_FLAGS_PER_CASE;
-
-  function toggleIndex(idx) {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else if (next.size < MAX_FLAGS_PER_CASE) next.add(idx);
-      return next;
-    });
-  }
-
-  const submitGuesses = useCallback(() => {
-    if (result) return;
-    clearInterval(timerRef.current);
-    const scored = scoreAnomalyHunt([...selectedIndices], caseFile.groundTruth, secondsRemaining, caseFile.series, yGuesses);
-    setResult(scored);
-    setTotalPoints((prev) => prev + scored.points);
-    setRoundHistory((prev) => [
-      ...prev,
-      {
-        title: caseFile.title,
-        difficulty: caseFile.difficulty,
-        anomaliesFound: scored.anomaliesFound,
-        anomaliesTotal: scored.anomaliesFound + scored.anomaliesMissed,
-        falseAlarms: scored.falseAlarms,
-        points: scored.points,
-      },
-    ]);
-
-    const playerFlags = caseFile.series.map((_, i) => selectedIndices.has(i));
-    const detectorResultsForCase = runAllDetectors(caseFile.series.map((p) => p.value), caseFile.groundTruth);
-    const humanEval = evaluateFlags(playerFlags, caseFile.groundTruth);
-    setDetectorResults(detectorResultsForCase);
-    setHumanScore(humanEval);
-
-    const detectorF1s = Object.values(detectorResultsForCase.scores).map((s) => s.f1);
-    const avgDetectorF1 = detectorF1s.reduce((a, b) => a + b, 0) / detectorF1s.length;
-    recordAnomalyCase({ accuracyPoints: scored.accuracyPoints, falseAlarms: scored.falseAlarms, totalFlags: selectedIndices.size, humanF1: humanEval.f1, avgDetectorF1 });
-    addHistoryEntry({ mode: 'anomaly_hunt', metric: caseFile.label, difficulty: caseFile.difficulty, score: scored.points, accuracy: scored.accuracyPoints });
-
-    setStage('result');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseFile, selectedIndices, secondsRemaining, yGuesses, result]);
+  const totalCases = importedSeries ? 1 : DIFFICULTY_SEQUENCE.length;
 
   useEffect(() => {
-    if (stage !== 'playing') return;
+    startCase(0);
+    return () => clearInterval(timerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function startCase(idx) {
+    clearInterval(timerRef.current);
+    const difficulty = DIFFICULTY_SEQUENCE[idx % DIFFICULTY_SEQUENCE.length];
+    const newCase = importedSeries
+      ? generateCaseFromSeries(importedSeries, importedMeta?.unit, difficulty, importedMeta?.title)
+      : generateAnomalyCase(difficulty, usedTemplateIds);
+    setUsedTemplateIds((prev) => [...prev, newCase.templateId]);
+    setCurrentCase(newCase);
+    setFlags([]);
+    setSecondsLeft(TIME_LIMIT_SECONDS);
+    setRevealed(false);
+    setResult(null);
+    setDetectorData(null);
+
     timerRef.current = setInterval(() => {
-      setSecondsRemaining((s) => {
+      setSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(timerRef.current);
-          submitGuesses();
           return 0;
         }
         return s - 1;
       });
     }, 1000);
-    return () => clearInterval(timerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
-
-  function startCase() {
-    setStage('playing');
-    setSecondsRemaining(TIME_LIMIT_SECONDS);
   }
 
-  function handleThrow(idx, value) {
-    if (stage !== 'playing') return;
-    setFocusedIndex(idx);
-    setYGuesses((prev) => ({ ...prev, [idx]: value }));
-    toggleIndex(idx);
-  }
-
-  function handleTableRow(idx) {
-    setFocusedIndex(idx);
-    toggleIndex(idx);
-  }
-
-  function nextCase() {
-    if (roundIdx + 1 < ROUND_COUNT) {
-      const nextIdx = roundIdx + 1;
-      const nextCaseFile = generateAnomalyCase(DIFFICULTY_SEQUENCE[nextIdx], usedTemplates);
-      setUsedTemplates((prev) => [...prev, nextCaseFile.templateId]);
-      setRoundIdx(nextIdx);
-      setCaseFile(nextCaseFile);
-      setSelectedIndices(new Set());
-      setFocusedIndex(null);
-      setYGuesses({});
-      setResult(null);
-      setDetectorResults(null);
-      setHumanScore(null);
-      setStage('briefing');
-    } else {
-      recordGameResult(MODE, totalPoints);
-      setGameOver(true);
+  useEffect(() => {
+    if (secondsLeft === 0 && !revealed && currentCase) {
+      handleReveal();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsLeft]);
+
+  const yGuessMap = useMemo(() => {
+    const map = {};
+    flags.forEach((f) => (map[f.index] = f.value));
+    return map;
+  }, [flags]);
+
+  function handlePlaceFlag(index, value) {
+    setFlags((prev) => (prev.length >= MAX_FLAGS_PER_CASE ? prev : [...prev, { index, value }]));
   }
 
-  if (gameOver) {
+  function handleRemoveFlag(index) {
+    setFlags((prev) => prev.filter((f) => f.index !== index));
+  }
+
+  function handleReveal() {
+    clearInterval(timerRef.current);
+    const values = currentCase.series.map((p) => p.value);
+    const scoreResult = scoreAnomalyHunt(flags.map((f) => f.index), currentCase.groundTruth, secondsLeft, currentCase.series, yGuessMap);
+    const detectors = runAllDetectors(values, currentCase.groundTruth);
+    setResult(scoreResult);
+    setDetectorData(detectors);
+    setRevealed(true);
+    setCaseResults((prev) => [...prev, { case: currentCase, score: scoreResult }]);
+
+    addHistoryEntry({
+      mode: 'anomaly_hunt',
+      caseTitle: currentCase.title,
+      difficulty: currentCase.difficulty,
+      points: scoreResult.points,
+      anomaliesFound: scoreResult.anomaliesFound,
+      anomaliesMissed: scoreResult.anomaliesMissed,
+      hits: scoreResult.hits,
+    });
+  }
+
+  function handleNext() {
+    if (caseIndex + 1 >= totalCases) {
+      setFinished(true);
+      return;
+    }
+    const nextIdx = caseIndex + 1;
+    setCaseIndex(nextIdx);
+    startCase(nextIdx);
+  }
+
+  function handleExit() {
+    if (!revealed && (flags.length > 0 || caseIndex > 0)) {
+      if (!window.confirm('Leave this investigation? Your progress on this session will be lost.')) return;
+    }
+    clearInterval(timerRef.current);
+    onNavigate('home');
+  }
+
+  if (!currentCase) return null;
+
+  if (finished) {
+    const totalPoints = caseResults.reduce((sum, c) => sum + c.score.points, 0);
+    const totalFound = caseResults.reduce((sum, c) => sum + c.score.anomaliesFound, 0);
+    const totalMissed = caseResults.reduce((sum, c) => sum + c.score.anomaliesMissed, 0);
     return (
-      <GameOverScreen totalPoints={totalPoints} scores={scores} roundHistory={roundHistory} onExit={onExit} onSubmitName={(name) => setScores(submitScore(MODE, name, totalPoints, ROUND_COUNT))} />
+      <PageShell eyebrow="Anomaly Hunt — Session complete" title="Investigation closed.">
+        <ResultBreakdown
+          total={totalPoints}
+          totalLabel="Session score"
+          rows={caseResults.map((c, i) => ({ label: `Case ${i + 1}: ${c.case.title}`, value: c.score.points }))}
+        />
+        <p className={styles.summaryLine}>
+          {totalFound} anomalies found · {totalMissed} missed across {caseResults.length} cases.
+        </p>
+        <div className={styles.nextRow}>
+          <Button variant="primary" onClick={() => onNavigate('home')}>Back to home</Button>
+        </div>
+      </PageShell>
     );
   }
 
-  const missedIndices = new Set(result ? result.hits.filter((h) => h.matchedIndex === null).map((h) => h.anomalyIndex) : []);
+  const detectorRows = detectorData
+    ? [
+        { key: 'human', method: 'You', ...pseudoHumanEval(result) },
+        ...Object.entries(detectorData.scores).map(([key, s]) => ({ key, method: DETECTOR_META[key].label, ...s })),
+      ]
+    : [];
 
   return (
-    <PageShell topbar={<TopBar onBack={onExit} right={<>Case {roundIdx + 1} of {ROUND_COUNT} <Pill tone={caseFile.difficulty}>{caseFile.difficulty}</Pill></>} />}>
-      <AnimatePresence mode="wait">
-        <motion.div key={caseFile.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-          <Panel className={styles.scenario}>
-            <h2>{caseFile.title}</h2>
-            <p>{caseFile.brief}</p>
-          </Panel>
+    <PageShell
+      eyebrow={`Anomaly Hunt — Case ${caseIndex + 1} of ${totalCases}`}
+      title={revealed ? 'Case review' : 'Find what broke.'}
+      actions={
+        <div className={styles.timerWrap}>
+          <Button variant="ghost" size="sm" onClick={handleExit}>Exit</Button>
+          <span className={`${styles.timerValue} ${secondsLeft <= 10 ? styles.timerUrgent : ''}`}>{secondsLeft}s</span>
+        </div>
+      }
+    >
+      <ObservationPanel title={currentCase.title} brief={currentCase.brief} difficulty={currentCase.difficulty} label={currentCase.label} />
 
-          <div className={styles.chartPanel}>
-            <AnomalyChart
-              series={caseFile.series}
-              unit={caseFile.unit}
-              label={caseFile.label}
-              selectedIndices={selectedIndices}
-              yGuesses={yGuesses}
-              onThrow={stage === 'playing' ? handleThrow : undefined}
-              focusedIndex={focusedIndex}
-              revealData={stage === 'result' ? { hits: result.hits, missedIndices } : null}
-              detectorFlagsByType={stage === 'result' ? detectorResults?.flagsByDetector : null}
-              layers={layers}
-              disabled={stage !== 'playing'}
-            />
-            <p className={styles.caption}>
-              {stage === 'result'
-                ? 'Toggle layers below to compare your flags against the true anomalies and each statistical detector.'
-                : "Drag a dart onto the chart and release to flag that spot — you don't have to hit the line exactly. Drag the slider below for a precise, guided throw instead."}
-            </p>
-          </div>
+      <div className={styles.chartWrap}>
+        <AnomalyChart
+          series={currentCase.series}
+          unit={currentCase.unit}
+          flags={flags}
+          maxFlags={MAX_FLAGS_PER_CASE}
+          onPlaceFlag={handlePlaceFlag}
+          onRemoveFlag={handleRemoveFlag}
+          groundTruth={currentCase.groundTruth}
+          revealed={revealed}
+          detectorFlags={detectorData?.combinedFlags}
+          disabled={revealed}
+        />
+      </div>
 
-          {stage === 'playing' && <DaySlider series={caseFile.series} unit={caseFile.unit} focusedIndex={focusedIndex} onChange={setFocusedIndex} />}
+      {!revealed && (
+        <div className={styles.controls}>
+          <p className={styles.hint}>Click or drag-throw onto the chart to flag a point. Up to {MAX_FLAGS_PER_CASE} flags.</p>
+          <Button variant="primary" onClick={handleReveal}>Lock in</Button>
+        </div>
+      )}
 
-          {stage === 'briefing' && (
-            <div className={styles.actions}>
-              <span className={styles.hint}>You'll have {TIME_LIMIT_SECONDS} seconds once you start.</span>
-              <Button variant="primary" onClick={startCase}>
-                Open case file
-              </Button>
-            </div>
-          )}
-
-          {stage === 'playing' && (
-            <div className={styles.obsRow}>
-              <ObservationPanel
-                series={caseFile.series}
-                unit={caseFile.unit}
-                focusedIndex={focusedIndex}
-                onFocusChange={setFocusedIndex}
-                selectedIndices={selectedIndices}
-                onToggleFocused={() => toggleIndex(focusedIndex)}
-                atFlagCap={atFlagCap}
+      <AnimatePresence>
+        {revealed && result && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={styles.reveal}>
+            <div className={styles.stampRow}>
+              <StampBadge
+                text={result.anomaliesMissed === 0 && result.falseAlarms === 0 ? 'Clean Sweep' : result.points >= 60 ? 'Case Closed' : 'Needs Review'}
+                tone={result.points >= 60 ? 'signal' : 'warn'}
               />
-              <FlaggedList series={caseFile.series} unit={caseFile.unit} selectedIndices={selectedIndices} onToggle={toggleIndex} />
+              {result.points >= 80 && <Confetti />}
             </div>
-          )}
 
-          {stage === 'playing' && (
-            <button className={styles.tableToggle} onClick={() => setShowTable((v) => !v)}>
-              {showTable ? '▾' : '▸'} {showTable ? 'Hide' : 'Show'} data table — browse every day as a list
-            </button>
-          )}
-          {stage === 'playing' && showTable && (
-            <DataTable series={caseFile.series} unit={caseFile.unit} selectedIndices={selectedIndices} focusedIndex={focusedIndex} onRowClick={handleTableRow} atFlagCap={atFlagCap} />
-          )}
+            <div className={styles.revealGrid}>
+              <ResultBreakdown
+                total={result.points}
+                rows={[
+                  { label: 'Accuracy', value: result.accuracyPoints },
+                  { label: 'False alarm penalty', value: -result.falseAlarmPenalty },
+                  { label: 'Speed bonus', value: result.speedBonus },
+                ]}
+              />
+              <div className={styles.compareWrap}>
+                <h4 className={styles.compareTitle}>Human vs. Machine</h4>
+                <DataTable
+                  highlightRowIndex={0}
+                  columns={[
+                    { key: 'method', label: 'Method' },
+                    { key: 'precision', label: 'Precision', render: (r) => r.precision.toFixed(2) },
+                    { key: 'recall', label: 'Recall', render: (r) => r.recall.toFixed(2) },
+                    { key: 'f1', label: 'F1', render: (r) => r.f1.toFixed(2) },
+                  ]}
+                  rows={detectorRows}
+                />
+              </div>
+            </div>
 
-          {stage === 'playing' && (
-            <StatRow>
-              <Stat label="Time remaining" value={`0:${String(secondsRemaining).padStart(2, '0')}`} warn={secondsRemaining <= 10} />
-              <Stat label="Flagged" value={selectedIndices.size} />
-            </StatRow>
-          )}
-
-          {stage === 'playing' && (
-            <div className={styles.actions}>
-              <span />
-              <Button variant="primary" onClick={submitGuesses}>
-                Submit findings
+            <div className={styles.nextRow}>
+              <Button variant="primary" onClick={handleNext}>
+                {caseIndex + 1 >= totalCases ? 'Finish' : 'Next case →'}
               </Button>
             </div>
-          )}
-
-          {stage === 'result' && (
-            <LayerToggles layers={layers} setLayers={setLayers} />
-          )}
-
-          {stage === 'result' && (
-            <StatRow>
-              <Stat label="Flagged" value={selectedIndices.size} />
-              <Stat label="Found" value={`${result.anomaliesFound}/${result.anomaliesFound + result.anomaliesMissed}`} />
-              <Stat label="False alarms" value={result.falseAlarms} />
-              <Stat label="Points earned" value={result.points} />
-            </StatRow>
-          )}
-
-          {stage === 'result' && <ResultBreakdown result={result} detectorResults={detectorResults} humanScore={humanScore} caseFile={caseFile} />}
-
-          {stage === 'result' && (
-            <div className={styles.actions}>
-              <span />
-              <Button variant="primary" onClick={nextCase}>
-                {roundIdx + 1 < ROUND_COUNT ? 'Next case' : 'Close investigation'}
-              </Button>
-            </div>
-          )}
-        </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </PageShell>
   );
 }
 
-function LayerToggles({ layers, setLayers }) {
-  const items = [
-    { key: 'yours', label: 'Your selections', color: 'var(--accent)' },
-    { key: 'actual', label: 'Actual anomalies', color: 'var(--success)' },
-    { key: 'rolling_zscore', label: 'Rolling Z-Score', color: 'var(--detector-zscore)' },
-    { key: 'rolling_iqr', label: 'Rolling IQR', color: 'var(--detector-iqr)' },
-    { key: 'weekly_seasonal_diff', label: 'Seasonal Diff', color: 'var(--detector-seasonal)' },
-  ];
-  return (
-    <div className={styles.layerRow}>
-      {items.map((it) => (
-        <label key={it.key} className={styles.layerToggle}>
-          <input type="checkbox" checked={!!layers[it.key]} onChange={(e) => setLayers((prev) => ({ ...prev, [it.key]: e.target.checked }))} />
-          <span className={styles.swatch} style={{ background: it.color }} />
-          {it.label}
-        </label>
-      ))}
-    </div>
-  );
-}
-
-function GameOverScreen({ totalPoints, scores, roundHistory, onSubmitName, onExit }) {
-  const [name, setName] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const displayedScore = useCountUp(Math.max(0, totalPoints), 1100);
-  const greatSession = roundHistory.length > 0 && roundHistory.filter((r) => r.points >= 60).length / roundHistory.length >= 0.6;
-
-  return (
-    <PageShell>
-      <TopBar onBack={onExit} />
-      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Investigation complete</h1>
-      <div className={styles.scoreWrap}>
-        <Confetti trigger={greatSession} />
-        <div className={styles.score}>{displayedScore} pts</div>
-      </div>
-
-      {!submitted ? (
-        <div className={styles.nameRow}>
-          <input className={styles.nameInput} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button
-            variant="primary"
-            onClick={() => {
-              onSubmitName(name);
-              setSubmitted(true);
-            }}
-          >
-            Save score
-          </Button>
-        </div>
-      ) : (
-        <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginBottom: 24 }}>Saved to this browser's leaderboard.</p>
-      )}
-
-      <Button variant="primary" onClick={onExit} style={{ marginBottom: 32 }}>
-        Done
-      </Button>
-
-      <h3 style={{ fontSize: 14, marginBottom: 8 }}>Leaderboard</h3>
-      <ul className={styles.leaderboard}>
-        {scores.map((s, i) => (
-          <li key={i}>
-            <span>
-              {i + 1}. {s.playerName}
-            </span>
-            <span>{s.totalPoints} pts</span>
-          </li>
-        ))}
-      </ul>
-    </PageShell>
-  );
+function pseudoHumanEval(result) {
+  if (!result) return { precision: 0, recall: 0, f1: 0 };
+  const tp = result.anomaliesFound;
+  const fp = result.falseAlarms;
+  const fn = result.anomaliesMissed;
+  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+  return { precision, recall, f1 };
 }

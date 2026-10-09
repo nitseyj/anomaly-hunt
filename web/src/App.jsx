@@ -1,57 +1,93 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import HomeScreen from './screens/Home/index.jsx';
-import AnomalyHuntScreen from './screens/AnomalyHunt/index.jsx';
-import ForecastCallScreen from './screens/ForecastCall/index.jsx';
-import DailyChallengeScreen from './screens/DailyChallenge/index.jsx';
-import ProfileScreen from './screens/Profile/index.jsx';
-import HistoryScreen from './screens/History/index.jsx';
-import ImportScreen from './screens/Import/index.jsx';
-import { generateCaseFromSeries } from './engine/case.js';
+import { Home } from './screens/Home/index.jsx';
+import { AnomalyHunt } from './screens/AnomalyHunt/index.jsx';
+import { ForecastCall } from './screens/ForecastCall/index.jsx';
+import { DailyChallenge } from './screens/DailyChallenge/index.jsx';
+import { Profile } from './screens/Profile/index.jsx';
+import { History } from './screens/History/index.jsx';
+import { Import } from './screens/Import/index.jsx';
+import { BootSequence } from './BootSequence.jsx';
+import { CommandPalette } from './components/CommandPalette.jsx';
 
-const SCREENS = {
-  home: HomeScreen,
-  anomaly_hunt: AnomalyHuntScreen,
-  forecast_call: ForecastCallScreen,
-  daily_challenge: DailyChallengeScreen,
-  profile: ProfileScreen,
-  history: HistoryScreen,
-  import: ImportScreen,
+const SCREEN_VARIANTS = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -12 },
 };
 
 export default function App() {
-  const [mode, setMode] = useState('home');
-  const [importedCase, setImportedCase] = useState(null);
+  const [booted, setBooted] = useState(() => sessionStorage.getItem('ah2-booted') === '1');
+  const [screen, setScreen] = useState('home');
+  const [importedSeries, setImportedSeries] = useState(null);
+  const [importedMeta, setImportedMeta] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  function handleImported(series, unit) {
-    setImportedCase(generateCaseFromSeries(series, unit, 'medium', 'Custom Data Investigation'));
-    setMode('anomaly_hunt');
+  useEffect(() => {
+    function handleKeyDown(e) {
+      const isK = e.key === 'k' || e.key === 'K';
+      if ((e.metaKey || e.ctrlKey) && isK) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (booted) {
+      try {
+        sessionStorage.setItem('ah2-booted', '1');
+      } catch {
+        // storage unavailable -- boot sequence will just replay each visit
+      }
+    }
+  }, [booted]);
+
+  function navigate(next) {
+    if (next !== 'anomaly') {
+      setImportedSeries(null);
+      setImportedMeta(null);
+    }
+    setScreen(next);
   }
 
-  function exitAnomalyHunt() {
-    setImportedCase(null);
-    setMode('home');
+  function startImported(series, meta) {
+    setImportedSeries(series);
+    setImportedMeta(meta);
+    setScreen('anomaly');
   }
 
-  const Screen = SCREENS[mode] ?? HomeScreen;
-  const props =
-    mode === 'home'
-      ? { onSelectMode: setMode }
-      : mode === 'anomaly_hunt'
-        ? { onExit: exitAnomalyHunt, importedCase }
-        : mode === 'import'
-          ? { onImported: handleImported, onExit: () => setMode('home') }
-          : { onExit: () => setMode('home') };
+  if (!booted) {
+    return <BootSequence onComplete={() => setBooted(true)} />;
+  }
+
+  const screens = {
+    home: <Home onNavigate={navigate} />,
+    anomaly: <AnomalyHunt key={importedSeries ? 'imported' : 'random'} onNavigate={navigate} importedSeries={importedSeries} importedMeta={importedMeta} />,
+    forecast: <ForecastCall onNavigate={navigate} />,
+    daily: <DailyChallenge onNavigate={navigate} />,
+    profile: <Profile onNavigate={navigate} />,
+    history: <History onNavigate={navigate} />,
+    import: <Import onNavigate={navigate} onStartImported={startImported} />,
+  };
 
   return (
     <>
-      <div className="ambient-glow" />
-      <div className="ambient-grain" />
       <AnimatePresence mode="wait">
-        <motion.div key={mode} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-          <Screen {...props} />
+        <motion.div
+          key={screen}
+          variants={SCREEN_VARIANTS}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {screens[screen]}
         </motion.div>
       </AnimatePresence>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={navigate} />
     </>
   );
 }

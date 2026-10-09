@@ -1,0 +1,45 @@
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-void);
+  cursor: pointer;
+}
+
+.terminal {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent-signal);
+  min-width: 320px;
+}
+
+.line {
+  margin-bottom: var(--space-2);
+  white-space: pre-wrap;
+}
+
+.prompt {
+  opacity: 0.6;
+  margin-right: var(--space-2);
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: var(--accent-signal);
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: caret-blink 1s step-end infinite;
+}
+
+.skipHint {
+  margin-top: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

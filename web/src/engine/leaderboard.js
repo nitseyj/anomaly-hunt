@@ -1,38 +1,20 @@
-/** Local-only leaderboard (localStorage) -- scores kept per mode since
- * their point scales aren't comparable. */
-const KEY = 'ah2-scores';
-const MAX_ENTRIES = 20;
+/**
+ * leaderboard.js
+ *
+ * This is a backend-free game, so "leaderboard" means the player's own
+ * best runs over time, ranked -- a personal-best board, not a global one.
+ */
+import { getHistory } from './history.js';
 
-function getAll() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+export function getPersonalBests(mode, limit = 10) {
+  return getHistory()
+    .filter((e) => e.mode === mode)
+    .sort((a, b) => (b.points || 0) - (a.points || 0))
+    .slice(0, limit);
 }
 
-export function getScores(mode) {
-  const all = getAll();
-  return Array.isArray(all[mode]) ? all[mode] : [];
-}
-
-export function submitScore(mode, playerName, totalPoints, roundsCompleted) {
-  const all = getAll();
-  const scores = Array.isArray(all[mode]) ? all[mode] : [];
-  scores.push({
-    playerName: (playerName || '').trim() || 'Anonymous Investigator',
-    totalPoints,
-    roundsCompleted,
-    date: new Date().toISOString(),
-  });
-  scores.sort((a, b) => b.totalPoints - a.totalPoints);
-  const trimmed = scores.slice(0, MAX_ENTRIES);
-  all[mode] = trimmed;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(all));
-  } catch {
-    // unavailable -- score still shows in-session, non-fatal
-  }
-  return trimmed;
+export function getBestDailyScore() {
+  const dailyRuns = getHistory().filter((e) => e.mode === 'daily_challenge');
+  if (dailyRuns.length === 0) return null;
+  return dailyRuns.reduce((best, e) => (e.points > (best?.points ?? -Infinity) ? e : best), null);
 }

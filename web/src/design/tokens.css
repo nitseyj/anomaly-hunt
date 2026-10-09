@@ -1,58 +1,66 @@
-/* ------------------------------------------------------------------
-   Design tokens -- the single source every CSS Module reads from.
-   A dark field-investigations aesthetic: one accent, a consistent cool
-   navy neutral family, tinted glow instead of flat black shadow, a
-   technical display face for headlines and tabular mono for data.
-   ------------------------------------------------------------------ */
-
 :root {
-  --bg: #07090f;
-  --surface: #10141f;
-  --surface-2: #161b29;
-  --surface-3: #1d2436;
-  --border: #232a3d;
-  --border-strong: #333c54;
+  /* Field-ops / signal-intelligence palette */
+  --bg-void: #05070c;
+  --bg-deep: #0a0e17;
+  --bg-panel: #0f1420;
+  --bg-panel-raised: #141b2b;
+  --bg-panel-hover: #1a2338;
+  --line-faint: rgba(255, 255, 255, 0.06);
+  --line-soft: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
 
-  --ink: #f5f7fb;
-  --ink-muted: #8b93aa;
-  --ink-faint: #5c6478;
+  --text-primary: #eef2f6;
+  --text-secondary: #9aa6b8;
+  --text-tertiary: #5c6880;
+  --text-disabled: #3a4256;
 
-  --accent: #4f7cff;
-  --accent-2: #7b9bff;
-  --accent-secondary: #00d4ff;
-  --accent-ink: #ffffff;
-  --accent-soft: rgba(79, 124, 255, 0.14);
-  --accent-glow: rgba(79, 124, 255, 0.4);
+  --accent-signal: #00f0c0;
+  --accent-signal-dim: #0a8a6f;
+  --accent-signal-glow: rgba(0, 240, 192, 0.35);
+  --accent-alert: #ff4d6a;
+  --accent-alert-glow: rgba(255, 77, 106, 0.35);
+  --accent-warn: #ffb547;
+  --accent-info: #4da8ff;
 
-  --success: #25d695;
-  --success-soft: rgba(37, 214, 149, 0.14);
-  --danger: #ff5c6c;
-  --danger-soft: rgba(255, 92, 108, 0.14);
-  --warning: #ffb547;
-  --warning-soft: rgba(255, 181, 71, 0.14);
+  --series-line: #7cc7ff;
+  --series-fill: rgba(124, 199, 255, 0.08);
+  --marker-truth: #ffb547;
+  --marker-flag: #00f0c0;
+  --marker-detector: #ff4d6a;
 
-  --detector-zscore: #00d4ff;
-  --detector-iqr: #ffb547;
-  --detector-seasonal: #b78cff;
+  --font-display: 'Big Shoulders Display', sans-serif;
+  --font-body: 'Public Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
-  --radius-sm: 7px;
-  --radius: 12px;
-  --radius-lg: 18px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
 
-  --font-display: 'Space Grotesk', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-  --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 
-  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
-  --duration-fast: 140ms;
-  --duration-base: 220ms;
-  --duration-slow: 420ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
 
-  --gutter: 24px;
-  --container-max: 1160px;
+  --shadow-panel: 0 20px 60px -20px rgba(0, 0, 0, 0.6);
+  --shadow-glow-signal: 0 0 32px var(--accent-signal-glow);
+  --shadow-glow-alert: 0 0 32px var(--accent-alert-glow);
 
-  color-scheme: dark;
+  --z-base: 0;
+  --z-panel: 10;
+  --z-overlay: 100;
+  --z-modal: 1000;
+  --z-toast: 2000;
 }
 
 * {
@@ -63,76 +71,63 @@ html,
 body {
   margin: 0;
   padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
-  position: relative;
-  min-height: 100dvh;
   overflow-x: hidden;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 800px 600px at 15% -10%, rgba(0, 240, 192, 0.07), transparent 60%),
+    radial-gradient(ellipse 900px 700px at 100% 10%, rgba(77, 168, 255, 0.05), transparent 60%),
+    var(--bg-void);
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   font-family: var(--font-display);
-  text-wrap: balance;
+  font-weight: 700;
   margin: 0;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
 }
 
 p {
-  text-wrap: pretty;
   margin: 0;
 }
 
-button,
-input,
-select {
+button {
   font-family: inherit;
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-/* Ambient depth: an off-center glow plus a near-invisible grain overlay,
-   so the background reads as a textured surface instead of a flat fill. */
-.ambient-glow {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  background: radial-gradient(900px 560px at 86% -8%, rgba(79, 124, 255, 0.13), transparent 60%),
-    radial-gradient(760px 480px at -6% 104%, rgba(0, 212, 255, 0.07), transparent 60%);
-}
-
-.ambient-grain {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.035;
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background: var(--accent-signal-glow);
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 4px;
+  background: var(--line-soft);
+  border-radius: var(--radius-pill);
 }
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--line-strong);
 }

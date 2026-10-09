@@ -1,0 +1,23 @@
+.grid {
+  pointer-events: none;
+}
+
+.gridLine {
+  stroke: var(--line-faint);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.yLabel {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  fill: var(--text-tertiary);
+  text-anchor: end;
+  dominant-baseline: middle;
+}
+
+.xLabel {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  fill: var(--text-tertiary);
+}

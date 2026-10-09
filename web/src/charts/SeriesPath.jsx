@@ -1,63 +1,69 @@
-import { useId, useRef, useLayoutEffect, useState } from 'react';
-import { line as d3Line, area as d3Area, curveMonotoneX } from 'd3-shape';
-import { CHART_COLORS } from '../design/chartColors.js';
+/**
+ * SeriesPath.jsx
+ *
+ * The line + area fill for a series, via d3-shape. The draw-in animation
+ * measures the path's ACTUAL rendered length with getTotalLength() rather
+ * than guessing a strokeDasharray constant -- a fixed guess under- or
+ * overshoots depending on how jagged a given 90-point series turns out
+ * to be, so animation speed would visibly vary case to case.
+ */
+import { useLayoutEffect, useRef, useState } from 'react';
+import { line as d3line, area as d3area, curveCatmullRom } from 'd3-shape';
+import { motion } from 'motion/react';
+import styles from './SeriesPath.module.css';
 
-/** The series line + gradient area fill, via d3-shape path generators --
- * built from the exact same scales (see useChartScales) that every
- * overlay marker reads, so the rendered curve and the math agree by
- * construction instead of needing to be independently verified. */
-export function SeriesPath({ series, scales, height, color = CHART_COLORS.line, animate = true }) {
-  const uid = useId();
-  const gradId = `series-area-${uid}`;
+// Centripetal Catmull-Rom (alpha 0.5) instead of curveMonotoneX: it still
+// passes through every actual data point (so markers placed at the same
+// (xScale(i), yScale(value)) stay exactly on the curve -- nothing about
+// marker alignment depends on which interpolation is used between
+// points), but reads as a noticeably calmer, more organic line through
+// closely-packed noisy points than monotone's sharper per-segment joints.
+const curve = curveCatmullRom.alpha(0.5);
+
+export function SeriesPath({ series, xScale, yScale, animate = true, color }) {
   const pathRef = useRef(null);
-  // The line's geometric length varies hugely with how jagged the data is
-  // (a zigzag path can be many times its bounding box) -- a fixed
-  // strokeDasharray would either cut the animation short or leave most of
-  // it statically drawn. Measuring the actual rendered length is the only
-  // way to make a "draw the line in" animation correct for arbitrary data.
-  const [pathLength, setPathLength] = useState(0);
+  const [length, setLength] = useState(0);
+
+  const lineGen = d3line()
+    .x((_, i) => xScale(i))
+    .y((d) => yScale(d.value))
+    .curve(curve);
+
+  const areaGen = d3area()
+    .x((_, i) => xScale(i))
+    .y0(yScale.range()[0])
+    .y1((d) => yScale(d.value))
+    .curve(curve);
+
+  const linePath = lineGen(series);
+  const areaPath = areaGen(series);
+
   useLayoutEffect(() => {
-    if (pathRef.current) setPathLength(pathRef.current.getTotalLength());
-  }, [series, scales]);
-
-  const lineGen = d3Line()
-    .x((_, i) => scales.x(i))
-    .y((p) => scales.y(p.value))
-    .curve(curveMonotoneX);
-
-  const areaGen = d3Area()
-    .x((_, i) => scales.x(i))
-    .y0(height)
-    .y1((p) => scales.y(p.value))
-    .curve(curveMonotoneX);
+    if (pathRef.current) setLength(pathRef.current.getTotalLength());
+  }, [linePath]);
 
   return (
-    <g>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={CHART_COLORS.areaTop} stopOpacity={0.22} />
-          <stop offset="100%" stopColor={CHART_COLORS.areaTop} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <path d={areaGen(series)} fill={`url(#${gradId})`} />
+    <g className={styles.group}>
+      <path d={areaPath} className={styles.area} />
       <path
         ref={pathRef}
-        d={lineGen(series)}
+        d={linePath}
         fill="none"
-        stroke={color}
-        strokeWidth={1.75}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        style={
-          animate && pathLength > 0
-            ? {
-                strokeDasharray: pathLength,
-                strokeDashoffset: pathLength,
-                animation: 'dd-draw-line 900ms var(--ease-out) forwards',
-              }
-            : undefined
-        }
+        stroke={color || 'var(--series-line)'}
+        className={styles.line}
+        style={animate ? { opacity: 0 } : undefined}
       />
+      {animate && length > 0 && (
+        <motion.path
+          d={linePath}
+          fill="none"
+          stroke={color || 'var(--series-line)'}
+          className={styles.lineReveal}
+          initial={{ strokeDasharray: length, strokeDashoffset: length }}
+          animate={{ strokeDashoffset: 0 }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+        />
+      )}
     </g>
   );
 }

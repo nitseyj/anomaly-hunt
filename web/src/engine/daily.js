@@ -3,24 +3,16 @@
  *
  * A deterministic, date-seeded Anomaly Hunt case: the calendar date
  * itself is the seed, so every player who opens the game on the same
- * local day gets the exact same case -- no backend, no server-assigned
- * puzzle. One attempt per local day, tracked in localStorage.
+ * local day gets the exact same case. One attempt per local day.
  */
 import { generateAnomalyCase } from './case.js';
 
 const RESULT_KEY = 'ah2-daily-result';
 
 function localDateParts(date = new Date()) {
-  return {
-    y: date.getFullYear(),
-    m: String(date.getMonth() + 1).padStart(2, '0'),
-    d: String(date.getDate()).padStart(2, '0'),
-  };
+  return { y: date.getFullYear(), m: String(date.getMonth() + 1).padStart(2, '0'), d: String(date.getDate()).padStart(2, '0') };
 }
 
-/** Local calendar components, not toISOString() -- that converts through
- * UTC first and reports the wrong day for hours around local midnight in
- * any negative-UTC-offset timezone. */
 export function todayKey(date = new Date()) {
   const { y, m, d } = localDateParts(date);
   return `${y}-${m}-${d}`;

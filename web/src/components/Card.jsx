@@ -1,31 +1,57 @@
-import { motion } from 'motion/react';
+/**
+ * Card.jsx
+ *
+ * `tilt` turns the card into a mouse-tracking 3D surface: rotateX/rotateY
+ * driven by cursor position relative to the card's own center, eased
+ * through a spring so it settles rather than snapping when the cursor
+ * leaves. Plain cards (most of the UI) skip all of this and cost nothing.
+ */
+import { useRef } from 'react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import styles from './Card.module.css';
 
-/** A clickable panel with a diagonal light-sweep on hover and a spring
- * lift -- used for the home-screen mode cards and the daily card. */
-export function Card({ children, onClick, highlight = false, className = '', ...props }) {
-  const cls = [styles.card, highlight ? styles.highlight : '', className].filter(Boolean).join(' ');
-  return (
-    <motion.button
-      type="button"
-      className={cls}
-      onClick={onClick}
-      whileHover={{ y: -3 }}
-      whileTap={{ scale: 0.99 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 26 }}
-      {...props}
-    >
-      <span className={styles.sheen} aria-hidden="true" />
-      {children}
-    </motion.button>
-  );
-}
+export function Card({ children, tilt = false, glow = false, className = '', as: As = 'div', ...rest }) {
+  const ref = useRef(null);
+  const rawRotX = useMotionValue(0);
+  const rawRotY = useMotionValue(0);
+  const rotateX = useSpring(rawRotX, { stiffness: 220, damping: 22 });
+  const rotateY = useSpring(rawRotY, { stiffness: 220, damping: 22 });
+  const glowX = useMotionValue(50);
+  const glowY = useMotionValue(50);
 
-/** A static (non-interactive) panel for grouping content. */
-export function Panel({ children, className = '', ...props }) {
+  const handleMove = (e) => {
+    if (!tilt || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    rawRotY.set((px - 0.5) * 14);
+    rawRotX.set((0.5 - py) * 14);
+    glowX.set(px * 100);
+    glowY.set(py * 100);
+  };
+
+  const handleLeave = () => {
+    rawRotX.set(0);
+    rawRotY.set(0);
+  };
+
+  const background = useTransform([glowX, glowY], ([gx, gy]) =>
+    glow ? `radial-gradient(circle at ${gx}% ${gy}%, rgba(0, 240, 192, 0.14), transparent 60%)` : undefined
+  );
+
+  const Component = motion[As] || motion.div;
+
   return (
-    <div className={[styles.panel, className].filter(Boolean).join(' ')} {...props}>
-      {children}
-    </div>
+    <Component
+      ref={ref}
+      className={`${styles.card} ${className}`}
+      style={tilt ? { rotateX, rotateY, transformPerspective: 800 } : undefined}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      {...rest}
+    >
+      {glow && <motion.div className={styles.glowLayer} style={{ background }} />}
+      <div className={styles.content}>{children}</div>
+    </Component>
   );
 }

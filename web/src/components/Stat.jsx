@@ -1,14 +1,17 @@
+import { useCountUp } from '../engine/useCountUp.js';
 import styles from './Stat.module.css';
 
-export function StatRow({ children }) {
-  return <div className={styles.row}>{children}</div>;
-}
+export function Stat({ label, value, suffix = '', decimals = 0, tone = 'default' }) {
+  const animated = useCountUp(typeof value === 'number' ? value : 0, { decimals });
+  const display = typeof value === 'number' ? animated.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : value;
 
-export function Stat({ label, value, warn = false }) {
   return (
     <div className={styles.stat}>
       <span className={styles.label}>{label}</span>
-      <span className={[styles.value, warn ? styles.warn : ''].filter(Boolean).join(' ')}>{value}</span>
+      <span className={`${styles.value} ${styles[tone]}`}>
+        {display}
+        {suffix}
+      </span>
     </div>
   );
 }

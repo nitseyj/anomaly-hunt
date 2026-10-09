@@ -1,0 +1,144 @@
+.headerActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+}
+
+.modeCard {
+  padding: var(--space-5);
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: border-color var(--dur-base) var(--ease-out-expo);
+}
+
+.modeCard:hover {
+  border-color: var(--accent-signal);
+}
+
+.modeHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.modeTitle {
+  font-size: 20px;
+  margin-bottom: var(--space-1);
+}
+
+.tagline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-signal);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
+}
+
+.body {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  flex-grow: 1;
+  margin-bottom: var(--space-4);
+}
+
+.enter {
+  align-self: flex-start;
+}
+
+.footerRow {
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.linkBtn:hover {
+  color: var(--accent-signal);
+}
+
+.logSection {
+  margin-top: var(--space-8);
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-lg);
+}
+
+.logHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.logTitle {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.logEmpty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.logList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.logRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line-faint);
+  font-size: 13px;
+}
+
+.logRow:last-child {
+  border-bottom: none;
+}
+
+.logCase {
+  flex-grow: 1;
+  color: var(--text-secondary);
+}
+
+.logPoints {
+  font-family: var(--font-mono);
+  color: var(--accent-signal);
+}
+
+.logPointsNeg {
+  color: var(--accent-alert);
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,7 +7,7 @@
  * through here so they're scored/detected/displayed identically.
  */
 import { createRng, randomSeed } from './rng.js';
-import { pickTemplate, makeDates, clampToUnit, SERIES_LENGTH } from './metrics.js';
+import { pickTemplate, clampToUnit, movingAverage, SERIES_LENGTH } from './metrics.js';
 import { injectAnomalies } from './anomalies.js';
 
 const round2 = (v) => Math.round(v * 100) / 100;
@@ -16,15 +16,11 @@ function caseId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/**
- * @param {string} difficulty - 'easy' | 'medium' | 'hard'
- * @param {string[]} usedTemplateIds - avoid repeating a metric within a session
- * @param {number|null} seed - deterministic when provided (Daily Challenge)
- */
 export function generateAnomalyCase(difficulty, usedTemplateIds = [], seed = null) {
   const rng = createRng(seed ?? randomSeed());
   const { template, scenario } = pickTemplate(rng, usedTemplateIds);
-  const { dates, values: cleanValues } = template.generate(rng, SERIES_LENGTH);
+  const { dates, values: rawValues } = template.generate(rng, SERIES_LENGTH);
+  const cleanValues = movingAverage(rawValues, 3);
   const { values: injected, groundTruth } = injectAnomalies(cleanValues, difficulty, rng);
   const clamped = clampToUnit(injected, template.unit);
 
@@ -41,7 +37,6 @@ export function generateAnomalyCase(difficulty, usedTemplateIds = [], seed = nul
   };
 }
 
-/** Same pipeline, seeded from an imported {date, value} series instead of a procedural template. */
 export function generateCaseFromSeries(series, unit, difficulty, title) {
   const rng = createRng(randomSeed());
   const dates = series.map((p) => p.date);

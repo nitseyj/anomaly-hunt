@@ -1,0 +1,106 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(2, 4, 7, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+}
+
+.panel {
+  width: min(520px, calc(100vw - 48px));
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel), 0 0 0 1px rgba(0, 240, 192, 0.08);
+  overflow: hidden;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.prompt {
+  font-family: var(--font-mono);
+  color: var(--accent-signal);
+  font-size: 16px;
+}
+
+.input {
+  flex-grow: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: var(--space-4);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemActive {
+  background: rgba(0, 240, 192, 0.1);
+  color: var(--accent-signal);
+}
+
+.itemHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.itemActive .itemHint {
+  color: var(--accent-signal);
+  opacity: 0.7;
+}

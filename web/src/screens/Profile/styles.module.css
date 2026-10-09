@@ -1,0 +1,29 @@
+.statsCard {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.skillsCard {
+  padding: var(--space-5);
+}
+
+.sectionTitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.skillList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .statsCard {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

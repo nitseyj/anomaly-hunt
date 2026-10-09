@@ -4,9 +4,8 @@ REM
 REM Usage: double-click this file, or run it from Command Prompt / PowerShell.
 REM
 REM This is the ONLY thing you need to run to play the game locally.
-REM Data for both game modes (Anomaly Hunt and Forecast Call) is generated
-REM live in the browser -- there's no separate data-build step, and no
-REM Python step required to play.
+REM Every case is generated live in the browser -- there's no separate
+REM data-build step required to play.
 
 cd /d "%~dp0web"
 

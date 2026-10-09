@@ -1,22 +1,35 @@
 .pill {
-  position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px 3px 18px;
-  border-radius: 999px;
-  text-transform: capitalize;
-  background: var(--surface-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-soft);
 }
 
-.pill::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.neutral {
+  background: var(--bg-panel-raised);
+  color: var(--text-secondary);
+}
+
+.signal {
+  background: rgba(0, 240, 192, 0.1);
+  color: var(--accent-signal);
+  border-color: rgba(0, 240, 192, 0.3);
+}
+
+.alert {
+  background: rgba(255, 77, 106, 0.1);
+  color: var(--accent-alert);
+  border-color: rgba(255, 77, 106, 0.3);
+}
+
+.warn {
+  background: rgba(255, 181, 71, 0.1);
+  color: var(--accent-warn);
+  border-color: rgba(255, 181, 71, 0.3);
 }

@@ -1,52 +1,96 @@
-.container {
+.wrap {
   position: relative;
   width: 100%;
-  height: 390px;
-}
-
-@media (min-width: 1024px) {
-  .container {
-    height: 470px;
-  }
-}
-
-@media (min-width: 1400px) {
-  .container {
-    height: 530px;
-  }
-}
-
-.svg {
-  display: block;
   user-select: none;
-}
-
-.overlay {
-  position: absolute;
-  inset: 0;
   touch-action: none;
 }
 
-.dartPreview {
-  pointer-events: none;
-  opacity: 0.55;
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%);
 }
 
-.dartLayer {
-  position: absolute;
-  pointer-events: none;
-  z-index: 2;
+.truthRing {
+  fill: none;
+  stroke: var(--marker-truth);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+  animation: pulse-ring-static 2.4s ease-out infinite;
 }
 
-.dartAnchor {
-  transform: translate(-50%, -100%);
+@keyframes pulse-ring-static {
+  0% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0.9;
+  }
 }
 
-.pulseRing {
-  animation: dd-pulse-ring 1800ms ease-out infinite;
-  /* Without fill-box, transform-origin on an SVG shape resolves against
-     the SVG viewport, not the circle's own geometry -- "center" would
-     pulse from the chart's corner instead of the circle's own center. */
+.truthDot {
+  fill: var(--marker-truth);
+}
+
+.detectorTick {
+  fill: var(--marker-detector);
+  opacity: 0.18;
+}
+
+.flagGroup {
+  filter: drop-shadow(0 2px 6px rgba(0, 240, 192, 0.4));
+}
+
+.dartMark {
+  fill: var(--marker-flag);
+  stroke: var(--bg-void);
+  stroke-width: 1;
+}
+
+.sonarRing {
+  fill: none;
+  stroke: var(--marker-flag);
+  stroke-width: 1.5;
   transform-box: fill-box;
   transform-origin: center;
+}
+
+.hoverLine {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.hoverDot {
+  fill: var(--text-primary);
+  stroke: var(--accent-signal);
+  stroke-width: 1.5;
+}
+
+.liveDartGroup {
+  filter: drop-shadow(0 4px 10px rgba(0, 240, 192, 0.5));
+}
+
+.liveDart {
+  fill: var(--accent-signal);
+  stroke: var(--bg-void);
+  stroke-width: 1;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.metaItem {
+  letter-spacing: 0.02em;
 }

@@ -1,39 +1,52 @@
-import { motion } from 'motion/react';
-import { LogoMark } from './Logo.jsx';
+/**
+ * PageShell.jsx
+ *
+ * The outer frame every screen renders inside: a fixed scanline/grain
+ * backdrop with subtle cursor-parallax depth, a top status bar, and a
+ * centered content column. AnimatePresence in App.jsx handles the
+ * transition between whichever screen sits inside this.
+ */
+import { useRef } from 'react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
+import { RadarField } from './RadarField.jsx';
 import styles from './PageShell.module.css';
 
-/** The consistent wrapper every screen renders inside: a topbar (either
- * the home wordmark+actions, or a "back" link) plus a motion-animated
- * content area so switching screens always gets a consistent entrance. */
-export function PageShell({ children, topbar, wide = false }) {
-  return (
-    <div className={[styles.shell, wide ? styles.wide : ''].filter(Boolean).join(' ')}>
-      {topbar}
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-}
+export function PageShell({ children, eyebrow, title, subtitle, actions, wide = false }) {
+  const ref = useRef(null);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const px = useSpring(rawX, { stiffness: 60, damping: 20 });
+  const py = useSpring(rawY, { stiffness: 60, damping: 20 });
+  const bgX = useTransform(px, (v) => v * 14);
+  const bgY = useTransform(py, (v) => v * 14);
 
-export function TopBar({ onBack, right }) {
+  const handleMove = (e) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    rawX.set(e.clientX / vw - 0.5);
+    rawY.set(e.clientY / vh - 0.5);
+  };
+
   return (
-    <div className={styles.topbar}>
-      {onBack ? (
-        <button className={styles.backLink} onClick={onBack}>
-          ← Anomaly Hunt
-        </button>
-      ) : (
-        <span className={styles.wordmark}>
-          <LogoMark />
-          Anomaly Hunt
-        </span>
-      )}
-      <span className={styles.right}>{right}</span>
+    <div className={styles.shell} ref={ref} onMouseMove={handleMove}>
+      <motion.div className={styles.backdrop} style={{ x: bgX, y: bgY }} />
+      <RadarField />
+      <div className={styles.grain} />
+      <div className={styles.scanline} />
+
+      <div className={`${styles.content} ${wide ? styles.wide : ''}`}>
+        {(eyebrow || title) && (
+          <header className={styles.header}>
+            <div>
+              {eyebrow && <div className={styles.eyebrow}>{eyebrow}</div>}
+              {title && <h1 className={styles.title}>{title}</h1>}
+              {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+            </div>
+            {actions && <div className={styles.actions}>{actions}</div>}
+          </header>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

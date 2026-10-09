@@ -1,52 +1,48 @@
-/** Per-case investigation history log -- separate from the leaderboard
- * (session totals only) and the profile (running aggregates only). */
+/**
+ * history.js
+ *
+ * Local-only match history: every completed Anomaly Hunt case and
+ * Forecast Call round gets appended here, persisted to localStorage.
+ * This is the single source of truth that profile.js and leaderboard.js
+ * derive their aggregates from.
+ */
+
 const HISTORY_KEY = 'ah2-history';
-const COUNTER_KEY = 'ah2-case-counter';
-const MAX_HISTORY = 100;
+const MAX_ENTRIES = 200;
 
-function nextCaseId() {
-  try {
-    const raw = localStorage.getItem(COUNTER_KEY);
-    const n = raw ? parseInt(raw, 10) + 1 : 1;
-    localStorage.setItem(COUNTER_KEY, String(n));
-    return String(n).padStart(4, '0');
-  } catch {
-    return String(Math.floor(Math.random() * 9000) + 1000);
-  }
-}
-
-export function getHistory() {
+function readRaw() {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-export function addHistoryEntry(entry) {
-  const history = getHistory();
-  const record = { caseId: nextCaseId(), date: new Date().toISOString(), ...entry };
-  const updated = [record, ...history].slice(0, MAX_HISTORY);
+function writeRaw(entries) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
   } catch {
-    // unavailable -- history won't persist this session, non-fatal
+    // storage unavailable -- history just won't persist, non-fatal
   }
-  return updated;
 }
 
-export const RESET_KEYS = ['ah2-scores', 'ah2-profile', 'ah2-history', 'ah2-case-counter', 'ah2-daily-result'];
+export function getHistory() {
+  return readRaw().sort((a, b) => b.timestamp - a.timestamp);
+}
 
-export function resetAllLocalData() {
-  let ok = true;
-  for (const key of RESET_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      ok = false;
-    }
-  }
-  return ok;
+export function addHistoryEntry(entry) {
+  const entries = readRaw();
+  const record = { ...entry, timestamp: Date.now(), id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+  entries.push(record);
+  writeRaw(entries);
+  return record;
+}
+
+export function clearHistory() {
+  writeRaw([]);
+}
+
+export function getHistoryByMode(mode) {
+  return getHistory().filter((h) => h.mode === mode);
 }

@@ -1,29 +1,44 @@
-import { useEffect, useState, useRef } from 'react';
+/**
+ * useCountUp.js
+ *
+ * Animates a number from its previous value to a new target whenever
+ * the target changes, using requestAnimationFrame directly (no deps) so
+ * score/stat readouts can tick up rather than snapping.
+ */
+import { useEffect, useRef, useState } from 'react';
 
-/** Animates a displayed number up to `target` via requestAnimationFrame
- * with ease-out cubic easing. Respects prefers-reduced-motion. */
-export function useCountUp(target, duration = 900) {
-  const [value, setValue] = useState(0);
-  const targetRef = useRef(target);
-  targetRef.current = target;
+const easeOutQuint = (t) => 1 - Math.pow(1 - t, 5);
+
+export function useCountUp(target, { duration = 700, decimals = 0 } = {}) {
+  const [display, setDisplay] = useState(target);
+  const fromRef = useRef(target);
+  const frameRef = useRef(null);
 
   useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      setValue(target);
-      return;
-    }
-    let raf;
-    const start = performance.now();
-    function tick(now) {
-      const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(eased * targetRef.current));
-      if (progress < 1) raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
+    const from = fromRef.current;
+    const to = target;
+    if (from === to) return;
 
-  return value;
+    const start = performance.now();
+    const tick = (now) => {
+      const elapsed = now - start;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeOutQuint(progress);
+      const value = from + (to - from) * eased;
+      setDisplay(Number(value.toFixed(decimals)));
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = to;
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, duration, decimals]);
+
+  return display;
 }

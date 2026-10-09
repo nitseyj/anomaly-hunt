@@ -1,43 +1,50 @@
-import { PageShell, TopBar } from '../../components/PageShell.jsx';
-import { getHistory } from '../../engine/history.js';
-import styles from './History.module.css';
+import { PageShell } from '../../components/PageShell.jsx';
+import { Button } from '../../components/Button.jsx';
+import { Pill } from '../../components/Pill.jsx';
+import { DataTable } from '../../components/DataTable.jsx';
+import { getHistory, clearHistory } from '../../engine/history.js';
+import styles from './styles.module.css';
 
-const MODE_LABELS = { anomaly_hunt: 'Anomaly Hunt', forecast_call: 'Forecast Call', daily_challenge: 'Daily Challenge' };
-const MODE_TONE = { anomaly_hunt: 'info', forecast_call: 'medium', daily_challenge: 'hard' };
+const MODE_LABELS = {
+  anomaly_hunt: 'Anomaly Hunt',
+  forecast_call: 'Forecast Call',
+  daily_challenge: 'Daily Challenge',
+};
 
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
+export function History({ onNavigate }) {
+  const entries = getHistory();
 
-export default function HistoryScreen({ onExit }) {
-  const history = getHistory();
+  function handleClear() {
+    if (window.confirm('Clear all local match history? This cannot be undone.')) {
+      clearHistory();
+      onNavigate('history');
+    }
+  }
 
   return (
-    <PageShell>
-      <TopBar onBack={onExit} />
-      <h1 style={{ fontSize: 22, fontWeight: 650, margin: '16px 0 20px' }}>Investigation history</h1>
-
-      {history.length === 0 ? (
-        <p style={{ fontSize: 14, color: 'var(--ink-muted)' }}>No cases completed yet — play a round of Anomaly Hunt or Forecast Call to start building your history.</p>
+    <PageShell
+      eyebrow="Match Log"
+      title="Past investigations."
+      subtitle="Stored locally in this browser only — nothing leaves your device."
+      actions={
+        <div className={styles.actions}>
+          <Button variant="ghost" size="sm" onClick={handleClear}>Clear</Button>
+          <Button variant="secondary" size="sm" onClick={() => onNavigate('home')}>← Home</Button>
+        </div>
+      }
+    >
+      {entries.length === 0 ? (
+        <p className={styles.empty}>No matches logged yet. Go play something.</p>
       ) : (
-        <ul className={styles.list}>
-          {history.map((entry) => (
-            <li key={entry.caseId + entry.date} className={styles.item}>
-              <span className={styles.caseId}>CASE {entry.caseId}</span>
-              <span className={styles.pill} data-tone={MODE_TONE[entry.mode] ?? 'info'}>
-                {MODE_LABELS[entry.mode] ?? entry.mode}
-              </span>
-              <span className={styles.metric}>{entry.metric}</span>
-              <span className={styles.detail}>{entry.mode === 'forecast_call' ? `${entry.questionType} · ${entry.isCorrect ? 'correct' : 'incorrect'}` : `${entry.difficulty} · ${entry.accuracy}% accuracy`}</span>
-              <span className={styles.score}>
-                {entry.score >= 0 ? '+' : ''}
-                {entry.score} pts
-              </span>
-              <span className={styles.date}>{formatDate(entry.date)}</span>
-            </li>
-          ))}
-        </ul>
+        <DataTable
+          columns={[
+            { key: 'mode', label: 'Mode', render: (r) => <Pill tone="neutral">{MODE_LABELS[r.mode] ?? r.mode}</Pill> },
+            { key: 'caseTitle', label: 'Case' },
+            { key: 'points', label: 'Points', render: (r) => (r.points > 0 ? `+${r.points}` : r.points) },
+            { key: 'timestamp', label: 'When', render: (r) => new Date(r.timestamp).toLocaleString() },
+          ]}
+          rows={entries}
+        />
       )}
     </PageShell>
   );

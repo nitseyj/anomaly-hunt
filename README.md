@@ -1,33 +1,34 @@
 # 🔍 Anomaly Hunt
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Stack](https://img.shields.io/badge/stack-React%20%7C%20Recharts%20%7C%20Python-blueviolet)
+![Stack](https://img.shields.io/badge/stack-React%20%7C%20Vite%20%7C%20Motion%20%7C%20D3-blueviolet)
 
 An open-source field-investigations game for practicing real BI/analytics
 skills: spotting anomalies in business data, forecasting where a trend
 goes next, and comparing your own judgement to real statistical methods.
 Every case is procedurally generated in the browser — no two playthroughs
-look the same.
+look the same, and no server ever sees your data.
 
 **[Play the live demo →](#)** *(add your GitHub Pages link here after deploying)*
 
 ## Three investigations, one engine
 
 All three modes are built on the same procedurally-generated
-business-metric library (`web/src/engine/metrics.js`) — seven
-metric templates (revenue, active users, support tickets, defect rate,
-response time, ad ROAS, churn rate), each randomized every time, so the
-underlying data engine is shared rather than duplicated per mode.
+business-metric library (`web/src/engine/metrics.js`) — seven metric
+templates (revenue, active users, support tickets, defect rate, response
+time, ad ROAS, churn rate), each randomized every time, so the underlying
+data engine is shared rather than duplicated per mode.
 
 ### 🕵️ Anomaly Hunt
 Five cases, 45 seconds each. A business metric is shown with 1–3 injected
 anomalies (point spikes, level shifts, missing-data gaps, trend breaks).
-Flag what looks wrong before time runs out. Scoring is **distance-based**:
-a flag near the true anomaly earns partial credit that fades with
-distance, not an all-or-nothing exact match (up to 6 flags per case).
-After each case, compare your picks to three real statistical detectors
-(rolling z-score, IQR, a seasonal-diff method) run against the same data,
-with toggleable chart layers and a real precision/recall/F1 "Human vs
+Click, or press-drag-release a dart onto the chart to flag what looks
+wrong before time runs out. Scoring is **distance-based**: a flag near
+the true anomaly earns partial credit that fades with distance — both in
+days and in value — not an all-or-nothing exact match (up to 6 flags per
+case). After each case, compare your picks to three real statistical
+detectors (rolling z-score, rolling IQR, a weekly-seasonal-diff method)
+run against the same data, with a real precision/recall/F1 "Human vs
 Machine" table — your score computed with the exact same methodology as
 the detectors, not a different metric dressed up to look comparable.
 
@@ -48,91 +49,71 @@ plays that day — the calendar date itself is the random seed, so no
 backend or server-assigned puzzle is needed. One attempt per local day.
 
 ### Progression
-A lightweight local rank system (`web/src/engine/profile.js`) tracks
-lifetime points across all three modes and shows an "investigator rank"
-on the home screen (Rookie Investigator → Master Detective), plus real
-derived statistics (accuracy, false alarm rate, a "statistical
-reasoning" skill comparing your F1 to the average detector's) — computed
-from actual per-case results, never hard-coded progress. Every completed
-case is also logged in a local investigation history with a sequential
-case ID, and everything can be wiped from Profile → Danger zone if you
-want a clean slate.
+A lightweight local rank system (`web/src/engine/profile.js`) derives
+lifetime stats purely from your match history (`web/src/engine/history.js`)
+— total score, hunt/forecast accuracy, best forecast streak, daily
+streak, and per-anomaly-type detection skill — and shows an analyst rank
+on the home screen (Rookie Analyst → Chief Investigator). Everything is
+a live projection of the history log, never stored separately, so it can
+never drift out of sync. History and local-only "personal best" boards
+(`leaderboard.js`) live entirely in `localStorage`; clearing it from the
+History screen gives you a clean slate.
 
-## How selecting a day works
+## The interaction
 
-Anomaly Hunt and Daily Challenge deliberately offer **three different
-ways to flag a day**, since no single input method works equally well
-for everyone:
-
-1. **The chart** — click near a point; Recharts snaps to the nearest day
-   and moves focus there (it does not flag by itself).
-2. **The slider** below the chart — a native range input for dragging to
-   an exact day with pinpoint accuracy, completely independent of any
-   chart click-detection.
-3. **The data table** — an expandable list of every day; because a row
-   click is never ambiguous the way a chart click can be, clicking a row
-   flags/unflags it directly in one action.
-
-Moving focus (via the chart or slider) never flags anything by itself —
-the Observation Panel's explicit "Flag this observation" button (or a
-table row) is what actually commits a flag. That separation, plus the
-6-flag cap, is deliberate: browsing around to compare candidates should
-never risk accidentally racking up flags.
+The chart itself is the only input: **click a point to flag it, or
+press and drag a dart onto the chart and release** — the dart follows
+your cursor with real spring physics while held, and snaps to the
+nearest day on release, reading its position back from the exact same
+scale the line is drawn with, so "lands exactly on the curve" is
+structural rather than something re-verified by hand per case. A second
+tap on a flagged point removes it.
 
 ## How it works
 
 1. **Data generation** — happens entirely client-side, no backend, no
-   pre-built files. Each mode's generator (`anomalies.js` /
-   `forecast.js` / `daily.js`) picks a random template,
-   randomizes its parameters, and (for Anomaly Hunt) injects labeled
-   anomalies.
+   pre-built files. Each mode's generator (`case.js` / `forecast.js` /
+   `daily.js`) picks a random metric template, randomizes its
+   parameters, and (for Anomaly Hunt) injects labeled anomalies spaced
+   far enough apart that no single flag can double-count credit.
 2. **Distance-based scoring in Anomaly Hunt, confidence-calibrated
    scoring in Forecast Call** — both fade smoothly rather than using an
-   exact-match cliff or a flat right/wrong. See `docs/methodology.md`
-   for the exact formulas, including how MCQ answers and distractors are
-   generated and independently verified against the real data.
+   exact-match cliff or a flat right/wrong.
 3. **Statistical comparison** — after an Anomaly Hunt case, three
-   lightweight detectors run against the same series so you can see
-   where your judgment agreed or disagreed with a model.
-4. Finish all rounds, save your score to a local leaderboard (kept
-   separately per mode), and start a **new investigation** for entirely
-   new data.
-
-See [`docs/methodology.md`](docs/methodology.md) for the full statistical
-reasoning behind all three modes.
+   lightweight detectors run against the same series, with the point
+   under test always excluded from its own baseline window (a naive
+   rolling window otherwise lets one strong outlier vouch for its own
+   normalcy), so you can see where your judgment agreed or disagreed
+   with a transparent model.
+4. Finish all rounds and the session score is broken down case by case,
+   then logged to your local match history.
 
 ## Repo structure
 
 ```
 anomaly-hunt/
-├── data-pipeline/                     # Python reference implementation (see note below)
-│   ├── source_data/                    # synthetic starter series
-│   ├── generate_sample_data.py
-│   ├── inject_anomalies.py
-│   ├── detect_anomalies.py             # includes full STL decomposition via statsmodels
-│   └── build_levels.py
 ├── web/                                 # the game — fully self-contained
 │   ├── src/engine/                     # the game's logic, zero UI code
-│   │   ├── rng.js                      # seedable PRNG + Gaussian sampler
+│   │   ├── rng.js                      # seedable PRNG (mulberry32) + Gaussian sampler
 │   │   ├── metrics.js                  # business-metric templates, formatting, unit floors
 │   │   ├── anomalies.js                # injects labeled anomalies (spaced to avoid double credit)
 │   │   ├── detectors.js                # z-score / IQR / weekly-diff, self-exclusion built in
 │   │   ├── scoring.js                  # Anomaly Hunt distance-based + Forecast confidence scoring
-│   │   ├── case.js / daily.js          # builds a round; date-seeded deterministic daily case
+│   │   ├── case.js                     # builds one playable round from a template or imported data
+│   │   ├── daily.js                    # date-seeded deterministic Daily Challenge
 │   │   ├── forecast.js                 # Forecast Call: builds the MCQ + distractors
 │   │   ├── dataImport.js               # parses an imported CSV/JSON series
 │   │   └── profile.js / leaderboard.js / history.js   # localStorage persistence
 │   ├── src/charts/                     # hand-rolled d3-scale/d3-shape charts, no chart library
 │   │   ├── useChartScales.js           # the ONE exact-domain scale every marker shares
-│   │   ├── AnomalyChart.jsx            # drag-to-throw dart, reveal layers, detector overlay
-│   │   ├── ForecastChart.jsx           # cutoff + reveal
+│   │   ├── AnomalyChart.jsx            # press-drag-release dart, reveal layers, detector overlay
+│   │   ├── ForecastChart.jsx           # cutoff fog panel + scanline reveal
 │   │   └── ChartGrid.jsx / SeriesPath.jsx
-│   ├── src/components/                 # the shared design-system pieces (Button, Card, Pill, …)
+│   ├── src/components/                 # shared design-system pieces (Button, Card, Pill, …)
 │   ├── src/screens/                    # one folder per screen: Home, AnomalyHunt, ForecastCall,
 │   │                                    #   DailyChallenge, Profile, History, Import
-│   ├── src/design/                     # tokens.css, animations.css, chartColors.js
-│   └── src/App.jsx                     # thin router + page-transition shell
-├── docs/methodology.md                 # statistical reasoning behind all three modes
+│   ├── src/design/                     # tokens.css, animations.css
+│   └── src/App.jsx                     # screen switcher + page-transition shell
 ├── .github/workflows/deploy.yml        # auto-deploys to GitHub Pages on push
 ├── start.sh / start.bat                # one-command local run (installs + starts dev server)
 └── LICENSE
@@ -159,8 +140,7 @@ npm run dev
 ```
 
 Either way, all three game modes generate their own data live in the
-browser — **no Python step, no separate data-build step, nothing to run
-before `npm run dev`.**
+browser — nothing to run before `npm run dev`.
 
 Open the local dev URL Vite prints once either command finishes.
 
@@ -168,36 +148,21 @@ To deploy for real, push to `main` — the included GitHub Actions workflow
 builds and deploys to GitHub Pages automatically (enable Pages in your
 repo's Settings → Pages → Source: GitHub Actions).
 
-## About the Python pipeline
-
-`data-pipeline/` is kept as a **reference implementation**, not a build
-dependency of the live game. It demonstrates the same anomaly-injection
-and detection logic (plus a proper STL decomposition via `statsmodels`,
-too heavy to ship to the browser) in a batch/notebook-friendly form.
-
-```bash
-cd data-pipeline
-pip install -r requirements.txt
-python generate_sample_data.py
-python build_levels.py
-```
-
 ## Known limitations
 
 - **All data is synthetic**, generated procedurally in the browser — not
   real business data, and isn't claiming to be. The goal is realistic
   *shape* (seasonality, trend, noise), not real-world accuracy.
-- The **weekly-seasonal-diff detector** (JS, live in the game) is a
-  lightweight stand-in for proper seasonal decomposition — the Python
-  reference implementation's full STL decomposition is more rigorous but
-  too heavy for a browser.
+- The **weekly-seasonal-diff detector** is a lightweight stand-in for
+  proper seasonal decomposition (e.g. STL) — simple enough to run live
+  in the browser, not a research-grade method.
 - The **credit radius (Anomaly Hunt) and confidence multipliers
   (Forecast Call)** are fixed values, not tuned per metric or per
   player.
-- **Leaderboards, rank, and history are local to one browser**
+- **Profile, history, and personal bests are local to one browser**
   (`localStorage`) — no identity, no cross-device sync.
-- Forecast Call always predicts 14 days past the visible window — no
-  adjustable forecast horizon yet.
+- Forecast Call always forecasts the same fixed fraction of the series —
+  no adjustable forecast horizon yet.
 
 ## Roadmap / good first issues
 
@@ -205,7 +170,7 @@ python build_levels.py
 - [ ] Add a shared online leaderboard (small serverless function + DB)
 - [ ] Add difficulty-adaptive level selection based on player performance
 - [ ] Add an adjustable forecast horizon to Forecast Call
-- [ ] Port an STL-quality seasonal decomposition to JS to replace the weekly-diff stand-in
+- [ ] Port a higher-fidelity seasonal decomposition to JS
 - [ ] Add a third mode: a **Data Quality** challenge (spotting missing
   values, duplicates, invalid records, timestamp problems in synthetic
   tabular data) — deliberately not started yet, to keep the existing

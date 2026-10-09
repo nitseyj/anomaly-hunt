@@ -5,14 +5,12 @@
  * radius around it -- a flag exactly on it earns full credit, a flag
  * within the radius earns credit that fades linearly with distance, a
  * flag outside every radius earns nothing and counts as a false alarm.
- * A dart throw (as opposed to the slider/table, which always aim exactly
- * on the curve) can also miss vertically, so its credit is a genuine 2D
+ * A dart throw can also miss vertically, so its credit is a genuine 2D
  * circular falloff combining how many days off AND how far off in value.
  *
- * Forecast Call: confidence-calibrated MCQ scoring, in forecastScoring()
- * below -- higher declared confidence multiplies both the reward for
- * being right and the penalty for being wrong, rewarding calibrated
- * judgement rather than blind conviction.
+ * Forecast Call: confidence-calibrated MCQ scoring in scoreForecastAnswer()
+ * -- higher declared confidence multiplies both the reward for being
+ * right and the penalty for being wrong.
  */
 
 export const CREDIT_RADIUS = 10; // index units (~days)
@@ -22,13 +20,6 @@ const FALSE_ALARM_PENALTY = 4;
 export const TIME_LIMIT_SECONDS = 45;
 export const MAX_FLAGS_PER_CASE = 6;
 
-/**
- * @param {number[]} guessedIndices
- * @param {{type:string,index:number}[]} groundTruthAnomalies
- * @param {number} secondsRemaining
- * @param {{date:string,value:number}[]} series
- * @param {Object<number,number>} yGuesses - flagged index -> the value a dart throw aimed at
- */
 export function scoreAnomalyHunt(guessedIndices, groundTruthAnomalies, secondsRemaining, series, yGuesses = {}) {
   const maxPerAnomaly = MAX_ACCURACY_POINTS / Math.max(groundTruthAnomalies.length, 1);
   const usedGuesses = new Set();
@@ -100,8 +91,6 @@ export const FORECAST_CONFIDENCE_LEVELS = ['low', 'medium', 'high'];
 
 export function scoreForecastAnswer(isCorrect, confidence) {
   const multiplier = FORECAST_CONFIDENCE_MULTIPLIERS[confidence] ?? 1.0;
-  if (isCorrect) {
-    return { points: Math.round(FORECAST_BASE_CORRECT * multiplier), multiplier };
-  }
+  if (isCorrect) return { points: Math.round(FORECAST_BASE_CORRECT * multiplier), multiplier };
   return { points: -Math.round(FORECAST_BASE_PENALTY * multiplier), multiplier };
 }

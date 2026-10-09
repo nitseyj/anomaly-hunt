@@ -1,76 +1,65 @@
-/** Parses user-supplied data (file or URL) into the {date, value} series
- * shape every generator already produces, so imported data flows through
- * the exact same anomaly-injection/scoring/detector pipeline. */
+/**
+ * dataImport.js
+ *
+ * Turns a user-supplied CSV or JSON file into a {date, value} series that
+ * generateCaseFromSeries() can inject anomalies into. Deliberately
+ * tolerant of messy real-world exports: flexible column names, skips
+ * unparsable rows instead of throwing.
+ */
+
+const DATE_KEYS = ['date', 'day', 'timestamp', 'time'];
+const VALUE_KEYS = ['value', 'amount', 'count', 'metric', 'y'];
+
+function findKey(row, candidates) {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const match = keys.find((k) => k.toLowerCase().trim() === c);
+    if (match) return match;
+  }
+  return null;
+}
 
 function parseCsv(text) {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-  if (lines.length === 0) throw new Error('The file appears to be empty.');
-
-  const rows = lines.map((line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, '')));
-  const first = rows[0];
-  const startIdx = first.length >= 2 && isNaN(parseFloat(first[1])) ? 1 : 0;
-
-  const series = [];
-  for (let i = startIdx; i < rows.length; i++) {
-    const [date, rawValue] = rows[i];
-    const value = parseFloat(rawValue);
-    if (!date || isNaN(value)) continue;
-    series.push({ date, value });
-  }
-  if (series.length < 10) throw new Error(`Only found ${series.length} valid rows — need at least 10 for a fair round.`);
-  return series;
-}
-
-function parseJson(text) {
-  const data = JSON.parse(text);
-  if (!Array.isArray(data)) throw new Error('Expected a JSON array of {date, value} objects.');
-  const series = [];
-  for (const row of data) {
-    const date = row.date ?? row.label ?? row.x;
-    const value = Number(row.value ?? row.y);
-    if (!date || isNaN(value)) continue;
-    series.push({ date: String(date), value });
-  }
-  if (series.length < 10) throw new Error(`Only found ${series.length} valid rows — need at least 10 for a fair round.`);
-  return series;
-}
-
-export function downsampleSeries(series, maxLength = 90) {
-  if (series.length <= maxLength) return series;
-  const step = series.length / maxLength;
-  return Array.from({ length: maxLength }, (_, i) => series[Math.floor(i * step)]);
-}
-
-export function parseSeriesText(text) {
-  const trimmed = text.trim();
-  return trimmed.startsWith('[') || trimmed.startsWith('{') ? parseJson(trimmed) : parseCsv(trimmed);
-}
-
-export function parseSeriesFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        resolve(parseSeriesText(String(reader.result)));
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.readAsText(file);
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) throw new Error('CSV needs a header row and at least one data row.');
+  const headers = lines[0].split(',').map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',');
+    const row = {};
+    headers.forEach((h, i) => (row[h] = cells[i]?.trim()));
+    return row;
   });
 }
 
-export async function parseSeriesUrl(url) {
-  let response;
-  try {
-    response = await fetch(url);
-  } catch {
-    throw new Error("Couldn't reach that URL — check it's correct and publicly accessible (CORS can block cross-site fetches).");
+export function parseImportedData(text, filename = '') {
+  const isJson = filename.toLowerCase().endsWith('.json') || text.trim().startsWith('[') || text.trim().startsWith('{');
+  let rows;
+
+  if (isJson) {
+    const parsed = JSON.parse(text);
+    rows = Array.isArray(parsed) ? parsed : parsed.data;
+    if (!Array.isArray(rows)) throw new Error('JSON must be an array of rows, or {"data": [...]}.');
+  } else {
+    rows = parseCsv(text);
   }
-  if (!response.ok) throw new Error(`Server responded with ${response.status}.`);
-  return parseSeriesText(await response.text());
+
+  if (rows.length === 0) throw new Error('No rows found.');
+
+  const dateKey = findKey(rows[0], DATE_KEYS);
+  const valueKey = findKey(rows[0], VALUE_KEYS);
+  if (!dateKey) throw new Error(`Couldn't find a date column (tried: ${DATE_KEYS.join(', ')}).`);
+  if (!valueKey) throw new Error(`Couldn't find a value column (tried: ${VALUE_KEYS.join(', ')}).`);
+
+  const series = [];
+  for (const row of rows) {
+    const date = String(row[dateKey]).trim();
+    const value = Number(row[valueKey]);
+    if (!date || Number.isNaN(value)) continue;
+    series.push({ date, value });
+  }
+
+  if (series.length < 14) throw new Error('Need at least 14 valid rows to generate a meaningful case.');
+
+  series.sort((a, b) => new Date(a.date) - new Date(b.date));
+  return series.slice(-120);
 }

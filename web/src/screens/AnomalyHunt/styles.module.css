@@ -1,0 +1,99 @@
+.timerWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-mono);
+}
+
+.timerValue {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+  min-width: 64px;
+  text-align: right;
+}
+
+.timerUrgent {
+  color: var(--accent-alert);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.chartWrap {
+  background: var(--bg-panel);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.reveal {
+  margin-top: var(--space-6);
+}
+
+.stampRow {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+
+.revealGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.compareWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.compareTitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.nextRow {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.summaryLine {
+  margin: var(--space-4) 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .revealGrid {
+    grid-template-columns: 1fr;
+  }
+}

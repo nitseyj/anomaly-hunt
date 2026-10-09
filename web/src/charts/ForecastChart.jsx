@@ -1,76 +1,81 @@
-import { useRef, useState, useCallback } from 'react';
+/**
+ * ForecastChart.jsx
+ *
+ * Shows the visible lead-in of a series with its ending hidden behind a
+ * frosted cutoff panel. On reveal, a scanline sweeps across and the
+ * hidden tail draws in -- sharing the exact same x/y scale as the
+ * visible portion, computed from the FULL series up front, so the
+ * reveal never re-scales (and thus never re-positions) the line that
+ * was already on screen.
+ */
+import { motion, AnimatePresence } from 'motion/react';
+import { line as d3line, curveCatmullRom } from 'd3-shape';
 import { useChartScales } from './useChartScales.js';
-import { ChartGrid, AxisY, AxisX } from './ChartGrid.jsx';
-import { SeriesPath } from './SeriesPath.jsx';
+import { ChartGrid } from './ChartGrid.jsx';
 import { formatValue } from '../engine/metrics.js';
-import { CHART_COLORS } from '../design/chartColors.js';
-import styles from './AnomalyChart.module.css';
+import styles from './ForecastChart.module.css';
 
-const MARGIN = { top: 12, right: 16, bottom: 28, left: 56 };
+const WIDTH = 820;
+const HEIGHT = 340;
+const curve = curveCatmullRom.alpha(0.5);
 
-/** Before reveal: only visible history, with a labeled cutoff. After
- * reveal: the actual future continues as a second, dashed series from
- * the same cutoff point, sharing the exact scale the visible series used
- * (the combined series' own min/max), so the two segments connect with
- * no seam and no second coordinate system to drift out of sync. */
-export default function ForecastChart({ visibleSeries, futureSeries, unit, label, revealed }) {
-  const containerRef = useRef(null);
-  const [size, setSize] = useState({ width: 800, height: 380 });
+export function ForecastChart({ visible, hidden, unit, revealed = false }) {
+  const fullSeries = [...visible, ...hidden];
+  const { xScale, yScale, padding } = useChartScales(fullSeries, { width: WIDTH, height: HEIGHT, padding: 64 });
 
-  const measure = useCallback((node) => {
-    if (!node) return;
-    containerRef.current = node;
-    const ro = new ResizeObserver((entries) => {
-      const { width: w, height: h } = entries[0].contentRect;
-      if (w > 0 && h > 0) setSize({ width: w, height: h });
-    });
-    ro.observe(node);
-    return () => ro.disconnect();
-  }, []);
+  const cutIndex = visible.length - 1;
 
-  const width = Math.max(0, size.width - MARGIN.left - MARGIN.right);
-  const height = Math.max(0, size.height - MARGIN.top - MARGIN.bottom);
+  const lineGen = d3line()
+    .x((_, i) => xScale(i))
+    .y((d) => yScale(d.value))
+    .curve(curve);
 
-  const combined = revealed && futureSeries?.length ? [...visibleSeries, ...futureSeries] : visibleSeries;
-  const scales = useChartScales(combined, width, height);
-  const cutoffIndex = visibleSeries.length - 1;
+  const visiblePath = lineGen(visible);
+  const fullPath = lineGen(fullSeries);
+  const cutoffX = xScale(cutIndex);
 
   return (
-    <div className={styles.container} ref={measure}>
-      <svg width={size.width} height={size.height} className={styles.svg}>
-        <g transform={`translate(${MARGIN.left},${MARGIN.top})`}>
-          <ChartGrid width={width} height={height} scales={scales} />
-          <AxisY scales={scales} formatValue={(v) => formatValue(v, unit)} width={width} />
-          <AxisX series={combined} scales={scales} height={height} />
+    <div className={styles.wrap}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className={styles.svg}>
+        <ChartGrid xScale={xScale} yScale={yScale} series={fullSeries} width={WIDTH} height={HEIGHT} unit={unit} formatValue={formatValue} />
 
-          <SeriesPath series={visibleSeries} scales={scales} height={height} animate />
+        <path d={revealed ? fullPath : visiblePath} fill="none" className={styles.line} />
 
-          {revealed && futureSeries?.length > 0 && (
-            <path
-              d={`M ${scales.x(cutoffIndex)} ${scales.y(visibleSeries[cutoffIndex].value)} ${futureSeries
-                .map((p, i) => `L ${scales.x(cutoffIndex + 1 + i)} ${scales.y(p.value)}`)
-                .join(' ')}`}
-              fill="none"
-              stroke={CHART_COLORS.creditHigh}
-              strokeWidth={1.75}
-              strokeDasharray="5 3"
-              strokeLinejoin="round"
-              strokeLinecap="round"
+        <line x1={cutoffX} x2={cutoffX} y1={padding} y2={HEIGHT - padding} className={styles.cutoffLine} />
+        <text x={cutoffX} y={padding - 8} className={styles.cutoffLabel} textAnchor="middle">
+          NOW
+        </text>
+
+        {!revealed && (
+          <rect x={cutoffX} y={padding} width={WIDTH - padding - cutoffX} height={HEIGHT - padding * 2} className={styles.fogPanel} />
+        )}
+
+        <AnimatePresence>
+          {revealed && (
+            <motion.rect
+              key="sweep"
+              y={padding}
+              width="4"
+              height={HEIGHT - padding * 2}
+              className={styles.sweep}
+              initial={{ x: cutoffX, opacity: 1 }}
+              animate={{ x: WIDTH - padding, opacity: [1, 1, 0] }}
+              transition={{ duration: 0.9, ease: 'easeOut' }}
             />
           )}
+        </AnimatePresence>
 
-          <line
-            x1={scales.x(cutoffIndex)}
-            x2={scales.x(cutoffIndex)}
-            y1={0}
-            y2={height}
-            stroke={CHART_COLORS.axisLine}
-            strokeDasharray="4 4"
+        {revealed && (
+          <motion.circle
+            r="5"
+            className={styles.finalDot}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.75, duration: 0.3 }}
+            cx={xScale(fullSeries.length - 1)}
+            cy={yScale(fullSeries[fullSeries.length - 1].value)}
           />
-          <text x={scales.x(cutoffIndex)} y={-2} textAnchor="middle" fontSize={10} fill={CHART_COLORS.axisText}>
-            {revealed ? 'Cutoff' : 'Forecast cutoff'}
-          </text>
-        </g>
+        )}
       </svg>
     </div>
   );
