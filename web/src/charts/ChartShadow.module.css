@@ -1,0 +1,39 @@
+.shadowGroup {
+  pointer-events: none;
+}
+
+.fogPuff {
+  fill: #bdf5e8;
+}
+
+.bodyGroup {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 14px rgba(0, 240, 192, 0.25));
+}
+
+.body {
+  fill: url(#ghost-fill);
+  stroke: rgba(10, 60, 50, 0.4);
+  stroke-width: 1.5;
+}
+
+.cheek {
+  fill: #ff9fb3;
+  opacity: 0.45;
+}
+
+.smile {
+  fill: none;
+  stroke: #0e2a26;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.eye {
+  fill: #0e2a26;
+}
+
+.eyeSparkle {
+  fill: #ffffff;
+  opacity: 0.95;
+}

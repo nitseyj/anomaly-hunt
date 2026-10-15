@@ -42,6 +42,9 @@ export function SeriesPath({ series, xScale, yScale, animate = true, color }) {
     if (pathRef.current) setLength(pathRef.current.getTotalLength());
   }, [linePath]);
 
+  const [xStart, xEnd] = xScale.range();
+  const [yBottom, yTop] = yScale.range();
+
   return (
     <g className={styles.group}>
       <path d={areaPath} className={styles.area} />
@@ -54,15 +57,27 @@ export function SeriesPath({ series, xScale, yScale, animate = true, color }) {
         style={animate ? { opacity: 0 } : undefined}
       />
       {animate && length > 0 && (
-        <motion.path
-          d={linePath}
-          fill="none"
-          stroke={color || 'var(--series-line)'}
-          className={styles.lineReveal}
-          initial={{ strokeDasharray: length, strokeDashoffset: length }}
-          animate={{ strokeDashoffset: 0 }}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-        />
+        <>
+          <motion.path
+            d={linePath}
+            fill="none"
+            stroke={color || 'var(--series-line)'}
+            className={styles.lineReveal}
+            initial={{ strokeDasharray: length, strokeDashoffset: length }}
+            animate={{ strokeDashoffset: 0 }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          />
+          <motion.line
+            x1="0"
+            x2="0"
+            y1={yTop}
+            y2={yBottom}
+            className={styles.scanBeam}
+            initial={{ x: xStart, opacity: 1 }}
+            animate={{ x: xEnd, opacity: [1, 1, 0] }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </>
       )}
     </g>
   );

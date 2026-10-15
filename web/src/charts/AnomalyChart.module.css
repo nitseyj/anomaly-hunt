@@ -5,6 +5,10 @@
   touch-action: none;
 }
 
+.svgWrap {
+  position: relative;
+}
+
 .svg {
   width: 100%;
   height: auto;
@@ -12,6 +16,9 @@
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%);
 }
+
+/* Corner brackets: see components/CornerBrackets.jsx + the global
+   .hud-corner* classes in design/tokens.css. */
 
 .truthRing {
   fill: none;
@@ -82,15 +89,83 @@
   stroke-width: 1;
 }
 
+.deltaBaseline {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+
+.deltaLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  fill: var(--text-disabled);
+}
+
+.deltaBarUp {
+  fill: var(--accent-signal);
+  opacity: 0.55;
+}
+
+.deltaBarDown {
+  fill: var(--accent-alert);
+  opacity: 0.55;
+}
+
+.deltaHoverLine {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
 .meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-top: var(--space-2);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-tertiary);
+  min-height: 28px;
 }
 
 .metaItem {
+  letter-spacing: 0.02em;
+}
+
+.evidenceTray {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.evidenceChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 240, 192, 0.08);
+  border: 1px solid rgba(0, 240, 192, 0.3);
+  color: var(--accent-signal);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out-expo), border-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.evidenceChip:hover {
+  background: rgba(255, 77, 106, 0.1);
+  border-color: rgba(255, 77, 106, 0.4);
+  color: var(--accent-alert);
+}
+
+.evidenceClose {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.evidenceCount {
+  color: var(--text-disabled);
   letter-spacing: 0.02em;
 }

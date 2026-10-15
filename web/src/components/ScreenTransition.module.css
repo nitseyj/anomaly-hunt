@@ -1,0 +1,22 @@
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.beam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-signal);
+  box-shadow: 0 0 40px 6px var(--accent-signal), 0 0 100px 20px rgba(0, 240, 192, 0.3);
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 240, 192, 0.08), transparent 70%);
+}

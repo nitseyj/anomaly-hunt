@@ -1,52 +1,10 @@
-.shell {
-  position: relative;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-.backdrop {
-  position: fixed;
-  inset: -5%;
-  z-index: var(--z-base);
-  pointer-events: none;
-  background:
-    radial-gradient(circle 500px at 20% 20%, rgba(0, 240, 192, 0.05), transparent 70%),
-    radial-gradient(circle 600px at 85% 75%, rgba(77, 168, 255, 0.04), transparent 70%);
-}
-
-.grain {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-base);
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain-shift 1.2s steps(2) infinite;
-}
-
-.scanline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 120px;
-  z-index: var(--z-base);
-  pointer-events: none;
-  opacity: 0.03;
-  background: linear-gradient(180deg, var(--accent-signal), transparent);
-  animation: scanline-sweep 9s linear infinite;
-}
-
 .content {
-  position: relative;
-  z-index: var(--z-panel);
-  max-width: 920px;
-  margin: 0 auto;
-  padding: var(--space-7) var(--space-5) var(--space-8);
+  max-width: 1320px;
+  padding: var(--space-7) var(--space-7) var(--space-8);
 }
 
 .content.wide {
-  max-width: 1200px;
+  max-width: 1560px;
 }
 
 .header {
@@ -61,7 +19,7 @@
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent-signal);
@@ -80,7 +38,7 @@
   color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.5;
-  max-width: 560px;
+  max-width: 640px;
 }
 
 .actions {
@@ -88,7 +46,82 @@
   gap: var(--space-3);
 }
 
-@media (max-width: 640px) {
+.heroHeader {
+  position: relative;
+  margin-bottom: var(--space-6);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-panel);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.heroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.3) contrast(1.1) brightness(0.48) saturate(1.15);
+}
+
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 9, 14, 0.25) 0%, rgba(5, 9, 14, 0.58) 55%, rgba(5, 9, 14, 0.93) 100%),
+    linear-gradient(100deg, rgba(0, 240, 192, 0.16), transparent 42%);
+}
+
+.heroTopBar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.heroCredit {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding-top: var(--space-2);
+}
+
+.heroActions {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(8px);
+  background: rgba(5, 9, 14, 0.35);
+}
+
+.heroText {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding: var(--space-6) var(--space-7);
+  max-width: 820px;
+}
+
+.heroCaption {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 600px;
+}
+
+@media (max-width: 860px) {
   .content {
     padding: var(--space-5) var(--space-4) var(--space-7);
   }
@@ -99,5 +132,30 @@
 
   .header {
     align-items: flex-start;
+  }
+
+  .heroHeader {
+    min-height: 220px;
+  }
+
+  .heroText {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .heroTopBar {
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .heroCaption {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* The credit line is a courtesy, not core UI -- on a narrow screen
+     the Exit/timer controls in the same row need the width more, and
+     cramming both caused them to visually collide. */
+  .heroCredit {
+    display: none;
   }
 }

@@ -9,21 +9,84 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-5);
-  border: 1px dashed var(--line-soft);
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+  border: 1.5px dashed var(--line-soft);
   border-radius: var(--radius-md);
+  background: var(--bg-panel-raised);
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-out-expo);
+  transition: border-color var(--dur-fast) var(--ease-out-expo), background var(--dur-fast) var(--ease-out-expo), transform var(--dur-fast) var(--ease-out-expo);
 }
 
 .fileLabel:hover {
   border-color: var(--accent-signal);
 }
 
+.fileLabelActive {
+  border-color: var(--accent-signal);
+  background: rgba(0, 240, 192, 0.06);
+  transform: scale(1.01);
+}
+
+.fileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  font-size: 14px;
+  color: var(--accent-signal);
+}
+
 .fileInput {
   display: none;
+}
+
+.preview {
+  overflow: hidden;
+  padding: var(--space-4);
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.previewHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.previewLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-signal);
+}
+
+.previewMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.sparkline {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+
+.sparklinePath {
+  stroke: var(--series-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(124, 199, 255, 0.3));
 }
 
 .row {

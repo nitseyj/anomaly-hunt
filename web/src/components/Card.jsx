@@ -44,14 +44,17 @@ export function Card({ children, tilt = false, glow = false, className = '', as:
   return (
     <Component
       ref={ref}
-      className={`${styles.card} ${className}`}
+      className={styles.card}
       style={tilt ? { rotateX, rotateY, transformPerspective: 800 } : undefined}
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
       {...rest}
     >
       {glow && <motion.div className={styles.glowLayer} style={{ background }} />}
-      <div className={styles.content}>{children}</div>
+      {/* className lands here, not on the outer element -- a consumer
+          passing layout classes (e.g. `display: grid`) is styling how
+          the card's CONTENT is arranged, which only this div controls. */}
+      <div className={`${styles.content} ${className}`}>{children}</div>
     </Component>
   );
 }

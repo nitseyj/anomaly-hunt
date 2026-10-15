@@ -19,14 +19,53 @@ function findKey(row, candidates) {
   return null;
 }
 
+/**
+ * A bare `line.split(',')` breaks on any quoted field containing a comma
+ * -- common in real exports (Excel/Sheets quote a thousands-separated
+ * number like "1,234.56", or any text field with a comma in it), and
+ * breaks silently: columns shift, values stop parsing as numbers, and
+ * the only symptom is a confusing "not enough valid rows" error on a
+ * file that looks completely fine. This walks the line char-by-char,
+ * tracking quote state, so a comma inside quotes doesn't split the row,
+ * and a doubled `""` inside a quoted field decodes to one literal `"`
+ * (the standard CSV escape).
+ */
+function parseCsvLine(line) {
+  const cells = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      cells.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) throw new Error('CSV needs a header row and at least one data row.');
-  const headers = lines[0].split(',').map((h) => h.trim());
+  const headers = parseCsvLine(lines[0]);
   return lines.slice(1).map((line) => {
-    const cells = line.split(',');
+    const cells = parseCsvLine(line);
     const row = {};
-    headers.forEach((h, i) => (row[h] = cells[i]?.trim()));
+    headers.forEach((h, i) => (row[h] = cells[i]));
     return row;
   });
 }
@@ -53,8 +92,12 @@ export function parseImportedData(text, filename = '') {
   const series = [];
   for (const row of rows) {
     const date = String(row[dateKey]).trim();
-    const value = Number(row[valueKey]);
-    if (!date || Number.isNaN(value)) continue;
+    // Strips thousands separators ("1,234.56") -- correctly splitting a
+    // quoted CSV field gets the comma back as literal text, which
+    // Number() still can't parse on its own.
+    const rawValue = String(row[valueKey] ?? '').replace(/,/g, '');
+    const value = Number(rawValue);
+    if (!date || rawValue === '' || Number.isNaN(value)) continue;
     series.push({ date, value });
   }
 

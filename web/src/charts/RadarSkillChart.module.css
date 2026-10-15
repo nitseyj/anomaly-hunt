@@ -1,0 +1,51 @@
+.svg {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--line-faint);
+  stroke-width: 1;
+}
+
+.axisLine {
+  stroke: var(--line-faint);
+  stroke-width: 1;
+}
+
+.dataGroup {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dataFill {
+  fill: rgba(0, 240, 192, 0.16);
+  stroke: var(--accent-signal);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 192, 0.35));
+}
+
+.dataDot {
+  fill: var(--accent-signal);
+  stroke: var(--bg-void);
+  stroke-width: 1.5;
+}
+
+.axisLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  fill: var(--text-tertiary);
+}
+
+.axisValue {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 400;
+  fill: var(--text-primary);
+}

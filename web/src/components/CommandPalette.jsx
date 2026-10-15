@@ -24,6 +24,7 @@ export function CommandPalette({ open, onClose, onNavigate }) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
+  const lastFocusedRef = useRef(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -33,9 +34,12 @@ export function CommandPalette({ open, onClose, onNavigate }) {
 
   useEffect(() => {
     if (open) {
+      lastFocusedRef.current = document.activeElement;
       setQuery('');
       setActiveIndex(0);
       requestAnimationFrame(() => inputRef.current?.focus());
+    } else {
+      lastFocusedRef.current?.focus?.();
     }
   }, [open]);
 
@@ -77,6 +81,9 @@ export function CommandPalette({ open, onClose, onNavigate }) {
         >
           <motion.div
             className={styles.panel}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Jump to a screen"
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
@@ -91,6 +98,8 @@ export function CommandPalette({ open, onClose, onNavigate }) {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Jump to a screen…"
+                aria-label="Jump to a screen"
+                aria-autocomplete="list"
                 className={styles.input}
               />
               <span className={styles.kbd}>esc</span>

@@ -9,3 +9,119 @@
   text-align: center;
   padding: var(--space-7) 0;
 }
+
+.filterRow {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-soft);
+  background: var(--bg-panel-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out-expo), color var(--dur-fast) var(--ease-out-expo);
+}
+
+.filterChip:hover {
+  color: var(--text-primary);
+}
+
+.filterChipActive {
+  border-color: var(--accent-signal);
+  color: var(--accent-signal);
+  background: rgba(0, 240, 192, 0.08);
+}
+
+.timeline {
+  position: relative;
+}
+
+.rail {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 20px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--line-soft), transparent 95%);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.node {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.nodeBadge svg {
+  width: 20px;
+  height: 20px;
+}
+
+.card {
+  flex-grow: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  transition: border-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.card:hover {
+  border-color: var(--line-soft);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.modeLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-signal);
+}
+
+.timestamp {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+}
+
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.caseTitle {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.points {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-signal);
+}
+
+.pointsNeg {
+  color: var(--accent-alert);
+}

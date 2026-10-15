@@ -1,17 +1,16 @@
 import { motion } from 'motion/react';
-import { Card } from '../../components/Card.jsx';
-import { Button } from '../../components/Button.jsx';
-import { Pill } from '../../components/Pill.jsx';
 import { PageShell } from '../../components/PageShell.jsx';
 import { IconBadge, AnomalyIcon, ForecastIcon, DailyIcon } from '../../components/ModeIcon.jsx';
+import { Pill } from '../../components/Pill.jsx';
 import { getTodayResult } from '../../engine/daily.js';
-import { getProfile } from '../../engine/profile.js';
 import { getHistory } from '../../engine/history.js';
+import heroPhoto from '../../assets/photos/home-aerial-city.jpg';
 import styles from './styles.module.css';
 
 const MODES = [
   {
     id: 'anomaly',
+    index: '001',
     Icon: AnomalyIcon,
     title: 'Anomaly Hunt',
     tagline: '5 cases · 45s each',
@@ -19,6 +18,7 @@ const MODES = [
   },
   {
     id: 'forecast',
+    index: '002',
     Icon: ForecastIcon,
     title: 'Forecast Call',
     tagline: '5 rounds · untimed',
@@ -26,6 +26,7 @@ const MODES = [
   },
   {
     id: 'daily',
+    index: '003',
     Icon: DailyIcon,
     title: 'Daily Challenge',
     tagline: 'One shared case per day',
@@ -36,7 +37,6 @@ const MODES = [
 const MODE_LABELS = { anomaly_hunt: 'Anomaly Hunt', forecast_call: 'Forecast Call', daily_challenge: 'Daily Challenge' };
 
 export function Home({ onNavigate }) {
-  const profile = getProfile();
   const dailyDone = Boolean(getTodayResult());
   const recent = getHistory().slice(0, 4);
 
@@ -45,51 +45,45 @@ export function Home({ onNavigate }) {
       eyebrow="Anomaly Hunt — Field Investigations Unit"
       title="Three ways to practice reading data like an analyst."
       subtitle="Every case is procedurally generated in the browser. No two playthroughs look the same, and no server ever sees your data."
-      actions={
-        <div className={styles.headerActions}>
-          <Button variant="ghost" size="sm" onClick={() => onNavigate('history')}>History</Button>
-          <Button variant="secondary" size="sm" onClick={() => onNavigate('profile')}>
-            {profile.rank}
-          </Button>
-        </div>
-      }
+      photo={{
+        src: heroPhoto,
+        caption: 'Every case starts here — pick a line of inquiry and the unit runs the rest.',
+        credit: 'Photo — 郭 心宇 / Unsplash',
+      }}
     >
-      <div className={styles.grid}>
+      <div className={styles.manifest}>
         {MODES.map((mode, i) => (
-          <motion.div
+          <motion.button
             key={mode.id}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className={styles.row}
+            onClick={() => onNavigate(mode.id)}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            whileHover="hover"
           >
-            <Card
-              tilt
-              glow
-              className={styles.modeCard}
-              onClick={() => onNavigate(mode.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onNavigate(mode.id);
-                }
-              }}
-            >
-              <div className={styles.modeHead}>
-                <IconBadge>
-                  <mode.Icon />
-                </IconBadge>
+            <motion.span
+              className={styles.rowAccent}
+              variants={{ hover: { scaleY: 1 } }}
+              initial={{ scaleY: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+            <span className={styles.rowIndex}>{mode.index}</span>
+            <IconBadge className={styles.rowIcon}>
+              <mode.Icon />
+            </IconBadge>
+            <span className={styles.rowBody}>
+              <span className={styles.rowTop}>
+                <span className={styles.rowTitle}>{mode.title}</span>
                 {mode.id === 'daily' && dailyDone && <Pill tone="signal">Completed today</Pill>}
-              </div>
-              <h3 className={styles.modeTitle}>{mode.title}</h3>
-              <p className={styles.tagline}>{mode.tagline}</p>
-              <p className={styles.body}>{mode.body}</p>
-              <Button variant="primary" size="sm" magnetic className={styles.enter}>
-                Enter →
-              </Button>
-            </Card>
-          </motion.div>
+              </span>
+              <span className={styles.rowTagline}>{mode.tagline}</span>
+              <span className={styles.rowDesc}>{mode.body}</span>
+            </span>
+            <motion.span className={styles.rowEnter} variants={{ hover: { x: 6 } }} transition={{ duration: 0.2 }}>
+              ENTER →
+            </motion.span>
+          </motion.button>
         ))}
       </div>
 
@@ -103,7 +97,7 @@ export function Home({ onNavigate }) {
         className={styles.logSection}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.5 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
       >
         <div className={styles.logHeader}>
           <h4 className={styles.logTitle}>Field log</h4>

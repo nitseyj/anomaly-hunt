@@ -1,0 +1,67 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.track {
+  position: relative;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line-soft);
+  overflow: hidden;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent-signal-dim), var(--accent-signal));
+  box-shadow: 0 0 20px rgba(0, 240, 192, 0.35);
+}
+
+.zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--line-faint);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zone:last-child {
+  border-right: none;
+}
+
+.zone:disabled {
+  cursor: not-allowed;
+}
+
+.zoneLabel {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.zoneLabelCovered {
+  color: var(--bg-void);
+  font-weight: 700;
+  text-shadow: none;
+}
+
+.multiplier {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: right;
+}

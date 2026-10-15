@@ -189,6 +189,14 @@ trend and reasoning about where it goes) than Anomaly Hunt's timed
 pattern-spotting, and rushing a forecast call doesn't reflect real
 analytical judgement the way it might for spotting an obvious outlier.
 
+## This isn't just described, it's tested
+
+Every correctness-critical claim on this page has a corresponding
+Vitest test in `web/src/engine/*.test.js` (`npm test` from `web/`) — in
+particular, the self-inclusion exclusion in the detectors and the
+Forecast Call band-width floor are both regression-tested against the
+exact failure mode described above, not just asserted in prose.
+
 ## Extending this project
 
 - Add a new anomaly type by extending `web/src/engine/anomalies.js`

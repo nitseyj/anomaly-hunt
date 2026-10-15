@@ -33,7 +33,7 @@ function splitSeries(series) {
   return { visible: series.slice(0, cut), hidden: series.slice(cut), cut };
 }
 
-function buildDirectionQuestion(visible, hidden, unit, rng) {
+export function buildDirectionQuestion(visible, hidden, unit, rng) {
   const lastVisible = visible[visible.length - 1].value;
   const lastHidden = hidden[hidden.length - 1].value;
   const delta = lastHidden - lastVisible;
@@ -54,7 +54,7 @@ function buildDirectionQuestion(visible, hidden, unit, rng) {
   };
 }
 
-function buildRangeQuestion(visible, hidden, unit, rng) {
+export function buildRangeQuestion(visible, hidden, unit, rng) {
   const lastHidden = hidden[hidden.length - 1].value;
   const visibleValues = visible.map((p) => p.value);
   const spread = Math.max(...visibleValues) - Math.min(...visibleValues) || Math.abs(mean(visibleValues)) * 0.1 || 1;
@@ -88,7 +88,7 @@ function buildRangeQuestion(visible, hidden, unit, rng) {
   };
 }
 
-function buildMagnitudeQuestion(visible, hidden, unit, rng) {
+export function buildMagnitudeQuestion(visible, hidden, unit, rng) {
   const lastVisible = visible[visible.length - 1].value;
   const lastHidden = hidden[hidden.length - 1].value;
   const pctChange = lastVisible !== 0 ? ((lastHidden - lastVisible) / Math.abs(lastVisible)) * 100 : 0;
@@ -110,7 +110,7 @@ function buildMagnitudeQuestion(visible, hidden, unit, rng) {
   };
 }
 
-function buildPatternQuestion(visible, hidden, unit, rng) {
+export function buildPatternQuestion(visible, hidden, unit, rng) {
   const hiddenValues = hidden.map((p) => p.value);
   const first = hiddenValues[0];
   const last = hiddenValues[hiddenValues.length - 1];
@@ -142,7 +142,7 @@ function buildPatternQuestion(visible, hidden, unit, rng) {
 
 const LOWER_IS_BETTER = new Set(['defect_rate', 'response_time', 'support_tickets', 'churn_rate']);
 
-function buildBusinessQuestion(visible, hidden, templateId, label, rng) {
+export function buildBusinessQuestion(visible, hidden, templateId, label, rng) {
   const lastVisible = visible[visible.length - 1].value;
   const lastHidden = hidden[hidden.length - 1].value;
   const delta = lastHidden - lastVisible;

@@ -1,0 +1,116 @@
+.wrap {
+  padding: var(--space-6) var(--space-5) var(--space-4);
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  background: var(--bg-panel-raised);
+  border-radius: var(--radius-pill);
+  margin: 0 8px;
+}
+
+.trackFill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.trackFillBar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-signal-dim), var(--accent-signal));
+  box-shadow: 0 0 10px rgba(0, 240, 192, 0.4);
+}
+
+.nodeWrap {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The first/last node sit exactly at the track's 0%/100% edge -- a
+   centered label there would overflow past the card boundary and get
+   clipped. Anchor these inward instead of centering on the node. */
+.edge-start {
+  transform: translate(0, -50%);
+  align-items: flex-start;
+}
+
+.edge-end {
+  transform: translate(-100%, -50%);
+  align-items: flex-end;
+}
+
+.node {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line-soft);
+  background: var(--bg-panel);
+}
+
+.node.done {
+  border-color: var(--accent-signal);
+  background: var(--accent-signal);
+}
+
+.node.current {
+  border-color: var(--accent-signal);
+  background: var(--bg-void);
+  box-shadow: 0 0 0 4px rgba(0, 240, 192, 0.18), 0 0 12px var(--accent-signal);
+}
+
+.node.locked {
+  opacity: 0.5;
+}
+
+.nodeLabel {
+  margin-top: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.nodeLabel.current {
+  color: var(--accent-signal);
+  font-weight: 700;
+}
+
+.nodeLabel.done {
+  color: var(--text-tertiary);
+}
+
+.hint {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.hint strong {
+  color: var(--accent-signal);
+  font-family: var(--font-mono);
+}
+
+/* At narrow widths, 5 fixed-width tier labels along a compressed track
+   collide into an unreadable overlap. The screen title already shows
+   the current rank and .hint already shows what's next, so the dots
+   alone still carry the "how far along" information without them. */
+@media (max-width: 640px) {
+  .nodeLabel {
+    display: none;
+  }
+
+  .wrap {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+}

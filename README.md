@@ -11,6 +11,20 @@ look the same, and no server ever sees your data.
 
 **[Play the live demo →](#)** *(add your GitHub Pages link here after deploying)*
 
+## Look and feel
+
+The whole app is framed as a fictional "Field Investigations Unit": a
+persistent sidebar console instead of a page-per-screen layout, each
+mode opening on a themed case-file banner (a real, credited photo with a
+dark teal duotone treatment, never a raw stock-photo drop) and a short
+in-world caption tying it back to the unit's story. Before a timed round
+actually starts, a **ready screen** lets you read the case brief first —
+the clock (Anomaly Hunt, Daily Challenge) never starts ticking until you
+click through it, and even untimed Forecast Call gets the same calm
+beat before the hidden data locks away. Switching screens in the sidebar
+sweeps the new one in with a spring-based "swoosh" rather than a plain
+fade.
+
 ## Three investigations, one engine
 
 All three modes are built on the same procedurally-generated
@@ -48,6 +62,14 @@ One deterministic, date-seeded Anomaly Hunt case shared by everyone who
 plays that day — the calendar date itself is the random seed, so no
 backend or server-assigned puzzle is needed. One attempt per local day.
 
+### 📥 Bring your own data
+Anomaly Hunt doesn't have to run on a procedurally-generated case — drop
+in your own CSV or JSON file (date + numeric value columns, flexible
+column-name aliases, tolerant of messy real-world exports including
+quoted/thousands-separated numbers) and investigate your own series
+instead, scored the same way as a generated case. Everything stays in
+your browser; nothing is uploaded anywhere.
+
 ### Progression
 A lightweight local rank system (`web/src/engine/profile.js`) derives
 lifetime stats purely from your match history (`web/src/engine/history.js`)
@@ -69,6 +91,12 @@ scale the line is drawn with, so "lands exactly on the curve" is
 structural rather than something re-verified by hand per case. A second
 tap on a flagged point removes it.
 
+The same chart is fully keyboard-operable too: focus it and use **Left
+/ Right to move between days, Enter or Space to flag or unflag the
+focused one** — a live region announces the day, value, and flagged
+state as you move, since the pointer path's visual hover readout alone
+wouldn't reach a screen-reader user.
+
 ## How it works
 
 1. **Data generation** — happens entirely client-side, no backend, no
@@ -88,6 +116,33 @@ tap on a flagged point removes it.
 4. Finish all rounds and the session score is broken down case by case,
    then logged to your local match history.
 
+## Testing & reliability
+
+```bash
+cd web
+npm test          # run the suite once
+npm run test:watch
+```
+
+The engine layer (`web/src/engine/*.js`) — the part that actually has to
+be statistically correct — has a [Vitest](https://vitest.dev) suite
+covering every module, including two regression tests for defects that
+were real, measured bugs during development and are exactly the kind of
+thing that could silently reappear without a test catching them:
+
+- **Self-inclusion bias in the rolling detectors** — a hand-computed
+  scenario asserting a window never lets the point under test vouch for
+  its own normalcy (see "Detection methods" in
+  [`docs/methodology.md`](docs/methodology.md)).
+- **The Forecast Call range-question band-width floor** — asserting the
+  answer band can never collapse to a degenerate zero-width option on a
+  metric pinned near its own floor.
+
+Each screen is also lazy-loaded (`React.lazy`) and wrapped in an error
+boundary, so a screen that fails to load — or throws — shows a small
+in-theme recovery panel with a way back to Home instead of a blank
+white screen.
+
 ## Repo structure
 
 ```
@@ -102,18 +157,28 @@ anomaly-hunt/
 │   │   ├── case.js                     # builds one playable round from a template or imported data
 │   │   ├── daily.js                    # date-seeded deterministic Daily Challenge
 │   │   ├── forecast.js                 # Forecast Call: builds the MCQ + distractors
-│   │   ├── dataImport.js               # parses an imported CSV/JSON series
-│   │   └── profile.js / leaderboard.js / history.js   # localStorage persistence
+│   │   ├── dataImport.js               # parses an imported CSV/JSON series (quote-aware)
+│   │   ├── profile.js / leaderboard.js / history.js   # localStorage persistence
+│   │   └── *.test.js                   # vitest coverage for every file above — see Testing below
 │   ├── src/charts/                     # hand-rolled d3-scale/d3-shape charts, no chart library
 │   │   ├── useChartScales.js           # the ONE exact-domain scale every marker shares
-│   │   ├── AnomalyChart.jsx            # press-drag-release dart, reveal layers, detector overlay
-│   │   ├── ForecastChart.jsx           # cutoff fog panel + scanline reveal
+│   │   ├── AnomalyChart.jsx            # press-drag-release dart (+ full keyboard path), detector overlay
+│   │   ├── ForecastChart.jsx / ChartShadow.jsx   # cutoff + the fog-bank/ghost hidden-region reveal
+│   │   ├── RadarSkillChart.jsx         # Profile's per-anomaly-type detection skill chart
 │   │   └── ChartGrid.jsx / SeriesPath.jsx
 │   ├── src/components/                 # shared design-system pieces (Button, Card, Pill, …)
+│   │   ├── AppShell.jsx                # persistent sidebar + ambient background, mounted once
+│   │   ├── ReadyGate.jsx               # the "read the brief, then start" pause before a round
+│   │   ├── PageShell.jsx               # per-screen header, incl. the photo case-file banner
+│   │   ├── ConfirmDialog.jsx / CommandPalette.jsx / ToastHub.jsx   # modal, ⌘K palette, achievement toasts
+│   │   └── ErrorBoundary.jsx / ScreenLoader.jsx   # per-screen crash/chunk-load recovery + lazy-load fallback
 │   ├── src/screens/                    # one folder per screen: Home, AnomalyHunt, ForecastCall,
 │   │                                    #   DailyChallenge, Profile, History, Import
-│   ├── src/design/                     # tokens.css, animations.css
-│   └── src/App.jsx                     # screen switcher + page-transition shell
+│   ├── src/assets/photos/              # credited Unsplash photos for each screen's case-file banner
+│   ├── src/design/                     # tokens.css (incl. the global focus-ring), animations.css
+│   ├── src/App.jsx                     # screen switcher, lazy-loaded per screen, page-transition shell
+│   └── vite.config.js                  # also wires up the vitest test runner (`test` block)
+├── docs/methodology.md                 # the statistical reasoning behind every scoring/detection rule
 ├── .github/workflows/deploy.yml        # auto-deploys to GitHub Pages on push
 ├── start.sh / start.bat                # one-command local run (installs + starts dev server)
 └── LICENSE

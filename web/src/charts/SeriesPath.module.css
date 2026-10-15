@@ -14,3 +14,10 @@
   stroke-linejoin: round;
   filter: drop-shadow(0 0 6px rgba(124, 199, 255, 0.25));
 }
+
+.scanBeam {
+  stroke: var(--accent-signal);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 10px var(--accent-signal));
+  pointer-events: none;
+}

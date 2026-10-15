@@ -54,3 +54,11 @@ export function saveTodayResult(result) {
   }
   return record;
 }
+
+/** Milliseconds until the next local-day rollover, when a new daily
+ * case becomes available (the seed is derived from local calendar date,
+ * see seedFromDate above, so "next case" always means local midnight). */
+export function msUntilNextDaily(now = new Date()) {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+}

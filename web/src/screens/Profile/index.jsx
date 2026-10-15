@@ -1,16 +1,34 @@
 import { PageShell } from '../../components/PageShell.jsx';
 import { Card } from '../../components/Card.jsx';
 import { Stat } from '../../components/Stat.jsx';
-import { SkillBar } from '../../components/SkillBar.jsx';
-import { Button } from '../../components/Button.jsx';
+import { RankLadder } from '../../components/RankLadder.jsx';
+import { RadarSkillChart } from '../../charts/RadarSkillChart.jsx';
 import { getProfile } from '../../engine/profile.js';
+import heroPhoto from '../../assets/photos/profile-milkyway.jpg';
 import styles from './styles.module.css';
 
-export function Profile({ onNavigate }) {
+export function Profile() {
   const profile = getProfile();
 
   return (
-    <PageShell eyebrow="Field Analyst Record" title={profile.rank} actions={<Button variant="ghost" size="sm" onClick={() => onNavigate('home')}>← Home</Button>}>
+    <PageShell
+      eyebrow="Field Analyst Record"
+      title={profile.rank}
+      photo={{
+        src: heroPhoto,
+        caption: 'Every closed case adds a line to your file. This is what the unit knows about you so far.',
+        credit: 'Photo — Dennis Zhang / Unsplash',
+      }}
+    >
+      <Card className={styles.rankCard}>
+        <RankLadder
+          rankIndex={profile.rankIndex}
+          rankProgress={profile.rankProgress}
+          pointsToNextRank={profile.pointsToNextRank}
+          nextRank={profile.nextRank}
+        />
+      </Card>
+
       <Card className={styles.statsCard}>
         <Stat label="Total score" value={profile.totalScore} tone="signal" />
         <Stat label="Cases played" value={profile.casesPlayed} />
@@ -22,12 +40,7 @@ export function Profile({ onNavigate }) {
 
       <Card className={styles.skillsCard}>
         <h3 className={styles.sectionTitle}>Detection skill by anomaly type</h3>
-        <div className={styles.skillList}>
-          <SkillBar label="Point spikes" fraction={profile.skills.pointSpike} />
-          <SkillBar label="Level shifts" fraction={profile.skills.levelShift} />
-          <SkillBar label="Missing gaps" fraction={profile.skills.missingGap} />
-          <SkillBar label="Trend breaks" fraction={profile.skills.trendBreak} />
-        </div>
+        <RadarSkillChart skills={profile.skills} />
       </Card>
     </PageShell>
   );

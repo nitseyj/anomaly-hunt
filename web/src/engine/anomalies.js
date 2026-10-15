@@ -8,13 +8,19 @@ import { CREDIT_RADIUS } from './scoring.js';
 
 export const ANOMALY_TYPES = ['point_spike', 'level_shift', 'missing_gap', 'trend_break'];
 
+// `rangeFloor` is a minimum anomaly size as a fraction of the series'
+// own value range -- a hard floor independent of std-based scaling, so
+// an anomaly can never be too subtle to notice regardless of how calm
+// a particular random draw's baseline turned out to be. Easier
+// difficulties get a more generous floor (bigger, more obvious
+// anomalies); harder difficulties rely more on genuine pattern-reading.
 const DIFFICULTY_SETTINGS = {
-  easy: { count: 1, magnitudeMult: 3.2, gapLenRange: [5, 8] },
-  medium: { count: 2, magnitudeMult: 2.4, gapLenRange: [4, 6] },
-  hard: { count: 3, magnitudeMult: 2.0, gapLenRange: [3, 4] },
+  easy: { count: 1, magnitudeMult: 3.2, rangeFloor: 0.3, gapLenRange: [5, 8] },
+  medium: { count: 2, magnitudeMult: 2.4, rangeFloor: 0.22, gapLenRange: [4, 6] },
+  hard: { count: 3, magnitudeMult: 2.0, rangeFloor: 0.16, gapLenRange: [3, 4] },
 };
 
-function stdDev(values) {
+export function stdDev(values) {
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
   return Math.sqrt(variance);
@@ -56,11 +62,22 @@ function pickAnomalyIndices(n, count, rng) {
   return chosen;
 }
 
-export function injectAnomalies(cleanValues, difficulty, rng) {
+/**
+ * `referenceStd` lets the caller supply the std of the series BEFORE any
+ * smoothing was applied to `cleanValues` (see case.js) -- magnitude is
+ * meant to track the metric's natural day-to-day variability, not
+ * whatever variability happens to survive smoothing. Scaling off the
+ * smoothed series' own (much smaller) std would make every anomaly
+ * shrink in lockstep with how calm the baseline was made to look, which
+ * is backwards: a calmer baseline should make anomalies read as MORE
+ * obvious, not less.
+ */
+export function injectAnomalies(cleanValues, difficulty, rng, referenceStd = null) {
   const settings = DIFFICULTY_SETTINGS[difficulty];
   const out = [...cleanValues];
   const n = out.length;
-  const std = stdDev(out) || 1e-6;
+  const std = referenceStd ?? stdDev(out) ?? 1e-6;
+  const range = Math.max(...cleanValues) - Math.min(...cleanValues) || Math.abs(cleanValues[0]) * 0.2 || 1;
   const [gapMin, gapMax] = settings.gapLenRange;
 
   const chosen = pickAnomalyIndices(n, settings.count, rng);
@@ -69,7 +86,8 @@ export function injectAnomalies(cleanValues, difficulty, rng) {
   for (const idx of chosen) {
     const type = ANOMALY_TYPES[Math.floor(rng() * ANOMALY_TYPES.length)];
     const direction = rng() < 0.5 ? 1 : -1;
-    const magnitude = std * settings.magnitudeMult * (0.85 + rng() * 0.3);
+    const stdBasedMagnitude = std * settings.magnitudeMult * (0.85 + rng() * 0.3);
+    const magnitude = Math.max(stdBasedMagnitude, range * settings.rangeFloor);
 
     const localWindow = out.slice(Math.max(0, idx - 10), idx);
     const localMean = localWindow.length > 0 ? localWindow.reduce((a, b) => a + b, 0) / localWindow.length : out[idx];
@@ -88,8 +106,11 @@ export function injectAnomalies(cleanValues, difficulty, rng) {
     } else {
       // trend_break: the flagged point must itself be visibly off, not
       // just where the slope begins to change -- a pure ramp is exactly
-      // zero deviation at i === idx.
-      const immediateStep = magnitude * 0.9;
+      // zero deviation at i === idx. The immediate step is deliberately
+      // LARGER than the base magnitude unit (not a fraction of it) so
+      // there's an unmistakable kink right at the break, not a gradual
+      // bend that only becomes obvious many points later.
+      const immediateStep = magnitude * 1.2;
       const slope = magnitude * 0.08;
       for (let i = idx; i < n; i++) {
         const rawDelta = direction * (immediateStep + (i - idx) * slope);

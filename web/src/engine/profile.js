@@ -7,7 +7,7 @@
  */
 import { getHistory } from './history.js';
 
-const RANKS = [
+export const RANKS = [
   { min: 0, name: 'Rookie Analyst' },
   { min: 300, name: 'Field Analyst' },
   { min: 900, name: 'Senior Analyst' },
@@ -15,12 +15,12 @@ const RANKS = [
   { min: 4000, name: 'Chief Investigator' },
 ];
 
-function rankForScore(totalScore) {
-  let current = RANKS[0];
-  for (const r of RANKS) {
-    if (totalScore >= r.min) current = r;
+function rankIndexForScore(totalScore) {
+  let idx = 0;
+  for (let i = 0; i < RANKS.length; i++) {
+    if (totalScore >= RANKS[i].min) idx = i;
   }
-  return current.name;
+  return idx;
 }
 
 export function getProfile() {
@@ -52,9 +52,18 @@ export function getProfile() {
 
   const dailyStreak = computeDailyStreak(entries.filter((e) => e.mode === 'daily_challenge'));
 
+  const rankIndex = rankIndexForScore(totalScore);
+  const currentRank = RANKS[rankIndex];
+  const nextRank = RANKS[rankIndex + 1] ?? null;
+  const rankProgress = nextRank ? (totalScore - currentRank.min) / (nextRank.min - currentRank.min) : 1;
+
   return {
     totalScore,
-    rank: rankForScore(totalScore),
+    rank: currentRank.name,
+    rankIndex,
+    nextRank: nextRank?.name ?? null,
+    pointsToNextRank: nextRank ? nextRank.min - totalScore : 0,
+    rankProgress: Math.max(0, Math.min(1, rankProgress)),
     casesPlayed,
     roundsPlayed,
     huntAccuracy,

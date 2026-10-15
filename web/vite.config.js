@@ -8,4 +8,8 @@ export default defineConfig({
   plugins: [react()],
   base: '/anomaly-hunt/',
   publicDir: 'public',
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
 })

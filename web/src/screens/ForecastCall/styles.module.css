@@ -14,6 +14,10 @@
 }
 
 .option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   text-align: left;
   padding: var(--space-4);
   border-radius: var(--radius-md);
@@ -23,6 +27,7 @@
   font-family: var(--font-body);
   font-size: 14px;
   cursor: pointer;
+  overflow: hidden;
   transition: border-color var(--dur-fast) var(--ease-out-expo), background var(--dur-fast) var(--ease-out-expo);
 }
 
@@ -34,9 +39,62 @@
   cursor: default;
 }
 
+.optionLetter {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.optionLabel {
+  flex-grow: 1;
+}
+
+.optionCheck {
+  flex-shrink: 0;
+  color: var(--accent-signal);
+  font-size: 16px;
+}
+
+.optionBadge,
+.optionBadgeWrong {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.optionBadge {
+  background: var(--accent-signal);
+  color: var(--bg-void);
+}
+
+.optionBadgeWrong {
+  background: var(--accent-alert);
+  color: var(--bg-void);
+}
+
 .optionSelected {
   border-color: var(--accent-signal);
   background: var(--bg-panel-hover);
+}
+
+.optionSelected .optionLetter {
+  border-color: var(--accent-signal);
+  color: var(--accent-signal);
 }
 
 .optionCorrect {
@@ -44,44 +102,47 @@
   background: rgba(0, 240, 192, 0.1);
 }
 
+.optionCorrect .optionLetter {
+  border-color: var(--accent-signal);
+  background: var(--accent-signal);
+  color: var(--bg-void);
+}
+
 .optionWrong {
   border-color: var(--accent-alert);
   background: rgba(255, 77, 106, 0.1);
 }
 
+.optionWrong .optionLetter {
+  border-color: var(--accent-alert);
+  background: var(--accent-alert);
+  color: var(--bg-void);
+}
+
 .confidenceRow {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  align-items: flex-end;
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
+.gaugeCol {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .confidenceLabel {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-right: var(--space-2);
-}
-
-.confidenceBtn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel-raised);
-  color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: capitalize;
-  cursor: pointer;
-}
-
-.confidenceActive {
-  border-color: var(--accent-signal);
-  color: var(--accent-signal);
-  background: rgba(0, 240, 192, 0.08);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
 }
 
 .lockBtn {
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .reveal {

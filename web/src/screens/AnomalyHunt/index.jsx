@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PageShell } from '../../components/PageShell.jsx';
 import { ObservationPanel } from '../../components/ObservationPanel.jsx';
+import { ReadyGate } from '../../components/ReadyGate.jsx';
 import { AnomalyChart } from '../../charts/AnomalyChart.jsx';
 import { Button } from '../../components/Button.jsx';
 import { DataTable } from '../../components/DataTable.jsx';
@@ -12,6 +13,9 @@ import { generateAnomalyCase, generateCaseFromSeries, DIFFICULTY_SEQUENCE } from
 import { scoreAnomalyHunt, TIME_LIMIT_SECONDS, MAX_FLAGS_PER_CASE } from '../../engine/scoring.js';
 import { runAllDetectors, DETECTOR_META } from '../../engine/detectors.js';
 import { addHistoryEntry } from '../../engine/history.js';
+import { pushToast } from '../../engine/toastBus.js';
+import { requestConfirm } from '../../engine/confirmBus.js';
+import heroPhoto from '../../assets/photos/anomaly-satellite.jpg';
 import styles from './styles.module.css';
 
 export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = null }) {
@@ -25,17 +29,22 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
   const [detectorData, setDetectorData] = useState(null);
   const [caseResults, setCaseResults] = useState([]);
   const [finished, setFinished] = useState(false);
+  const [started, setStarted] = useState(false);
   const timerRef = useRef(null);
 
   const totalCases = importedSeries ? 1 : DIFFICULTY_SEQUENCE.length;
 
   useEffect(() => {
-    startCase(0);
+    prepareCase(0);
     return () => clearInterval(timerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function startCase(idx) {
+  // Loads the case and its brief, but leaves the clock untouched --
+  // nothing starts ticking until the player clicks through the
+  // ReadyGate, so landing on a fresh case never ambushes them with a
+  // countdown they haven't had a chance to read the brief for yet.
+  function prepareCase(idx) {
     clearInterval(timerRef.current);
     const difficulty = DIFFICULTY_SEQUENCE[idx % DIFFICULTY_SEQUENCE.length];
     const newCase = importedSeries
@@ -48,7 +57,11 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
     setRevealed(false);
     setResult(null);
     setDetectorData(null);
+    setStarted(false);
+  }
 
+  function beginCase() {
+    setStarted(true);
     timerRef.current = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
@@ -100,6 +113,12 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
       anomaliesMissed: scoreResult.anomaliesMissed,
       hits: scoreResult.hits,
     });
+
+    if (scoreResult.anomaliesMissed === 0 && scoreResult.falseAlarms === 0) {
+      pushToast({ title: 'Clean Sweep', detail: 'Every anomaly flagged, zero false alarms.' });
+    } else if (scoreResult.points >= 80) {
+      pushToast({ title: 'Strong Case Work', detail: `+${scoreResult.points} points` });
+    }
   }
 
   function handleNext() {
@@ -109,15 +128,22 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
     }
     const nextIdx = caseIndex + 1;
     setCaseIndex(nextIdx);
-    startCase(nextIdx);
+    prepareCase(nextIdx);
   }
 
-  function handleExit() {
+  async function handleExit() {
     if (!revealed && (flags.length > 0 || caseIndex > 0)) {
-      if (!window.confirm('Leave this investigation? Your progress on this session will be lost.')) return;
+      const ok = await requestConfirm({
+        title: 'Leave this investigation?',
+        message:
+          "Your progress on this case won't be saved — only a completed investigation is added to your match log. Opening Anomaly Hunt again starts a brand new case, not this one.",
+        confirmLabel: 'Leave',
+        cancelLabel: 'Stay',
+      });
+      if (!ok) return;
     }
     clearInterval(timerRef.current);
-    onNavigate('home');
+    onNavigate('home', { skipGuard: true });
   }
 
   if (!currentCase) return null;
@@ -137,7 +163,7 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
           {totalFound} anomalies found · {totalMissed} missed across {caseResults.length} cases.
         </p>
         <div className={styles.nextRow}>
-          <Button variant="primary" onClick={() => onNavigate('home')}>Back to home</Button>
+          <Button variant="primary" onClick={() => onNavigate('home', { skipGuard: true })}>Back to home</Button>
         </div>
       </PageShell>
     );
@@ -154,35 +180,54 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
     <PageShell
       eyebrow={`Anomaly Hunt — Case ${caseIndex + 1} of ${totalCases}`}
       title={revealed ? 'Case review' : 'Find what broke.'}
+      photo={{
+        src: heroPhoto,
+        caption: "Somewhere in this signal, something doesn't belong. You get one pass before the window closes.",
+        credit: 'Photo — Stephan Widua / Unsplash',
+      }}
       actions={
         <div className={styles.timerWrap}>
           <Button variant="ghost" size="sm" onClick={handleExit}>Exit</Button>
-          <span className={`${styles.timerValue} ${secondsLeft <= 10 ? styles.timerUrgent : ''}`}>{secondsLeft}s</span>
+          {started && <span className={`${styles.timerValue} ${secondsLeft <= 10 ? styles.timerUrgent : ''}`}>{secondsLeft}s</span>}
         </div>
       }
     >
       <ObservationPanel title={currentCase.title} brief={currentCase.brief} difficulty={currentCase.difficulty} label={currentCase.label} />
 
-      <div className={styles.chartWrap}>
-        <AnomalyChart
-          series={currentCase.series}
-          unit={currentCase.unit}
-          flags={flags}
-          maxFlags={MAX_FLAGS_PER_CASE}
-          onPlaceFlag={handlePlaceFlag}
-          onRemoveFlag={handleRemoveFlag}
-          groundTruth={currentCase.groundTruth}
-          revealed={revealed}
-          detectorFlags={detectorData?.combinedFlags}
-          disabled={revealed}
+      {!started && (
+        <ReadyGate
+          detail={`You'll have ${TIME_LIMIT_SECONDS} seconds once the clock starts. Read the brief above, then start when you're ready.`}
+          buttonLabel="Start case"
+          onStart={beginCase}
         />
-      </div>
+      )}
 
-      {!revealed && (
-        <div className={styles.controls}>
-          <p className={styles.hint}>Click or drag-throw onto the chart to flag a point. Up to {MAX_FLAGS_PER_CASE} flags.</p>
-          <Button variant="primary" onClick={handleReveal}>Lock in</Button>
-        </div>
+      {started && (
+        <>
+          <div className={styles.chartWrap}>
+            <AnomalyChart
+              series={currentCase.series}
+              unit={currentCase.unit}
+              flags={flags}
+              maxFlags={MAX_FLAGS_PER_CASE}
+              onPlaceFlag={handlePlaceFlag}
+              onRemoveFlag={handleRemoveFlag}
+              groundTruth={currentCase.groundTruth}
+              revealed={revealed}
+              detectorFlags={detectorData?.combinedFlags}
+              disabled={revealed}
+            />
+          </div>
+
+          {!revealed && (
+            <div className={styles.controls}>
+              <p className={styles.hint}>
+                Click or drag-throw onto the chart to flag a point (or focus the chart and use arrow keys + Enter). Up to {MAX_FLAGS_PER_CASE} flags.
+              </p>
+              <Button variant="primary" onClick={handleReveal}>Lock in</Button>
+            </div>
+          )}
+        </>
       )}
 
       <AnimatePresence>
