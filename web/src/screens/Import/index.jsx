@@ -13,6 +13,11 @@ import styles from './styles.module.css';
 const UNIT_OPTIONS = ['usd', 'count', 'percent', 'ms', 'roas'];
 const PREVIEW_WIDTH = 500;
 const PREVIEW_HEIGHT = 80;
+// A legitimate case file (a few hundred daily rows) is a handful of KB at
+// most. This cap exists purely to stop readAsText()/JSON.parse() from
+// trying to load an enormous or mis-selected file into memory and
+// freezing the tab -- generous enough that no real import ever hits it.
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 export function Import({ onStartImported }) {
   const [text, setText] = useState('');
@@ -33,6 +38,10 @@ export function Import({ onStartImported }) {
 
   function readFile(file) {
     if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      setError(`That file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Keep it under ${MAX_FILE_BYTES / (1024 * 1024)} MB -- a case file is just a few hundred rows.`);
+      return;
+    }
     setFilename(file.name);
     const reader = new FileReader();
     reader.onload = () => setText(String(reader.result));
@@ -63,10 +72,10 @@ export function Import({ onStartImported }) {
     <PageShell
       eyebrow="Bring Your Own Data"
       title="Investigate your own series."
-      subtitle="Upload a CSV or JSON file with a date column and a numeric value column. Everything stays in your browser."
+      subtitle="Upload a CSV or JSON file with a date column and a numeric value column. The unit works your real shape into the case -- practice irregularities get added on top of it, the same way every other case is built. Everything stays in your browser."
       photo={{
         src: heroPhoto,
-        caption: "Bring your own signal. The unit doesn't only work manufactured cases.",
+        caption: 'Bring your own signal. The unit builds the case on your real shape, not a template.',
         credit: 'Photo — Max Bender / Unsplash',
       }}
     >

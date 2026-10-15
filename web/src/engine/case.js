@@ -48,7 +48,11 @@ export function generateCaseFromSeries(series, unit, difficulty, title) {
     id: caseId(),
     templateId: 'imported',
     title: title || 'Custom Data Investigation',
-    brief: 'Your own imported dataset. Find whatever looks out of place.',
+    // Honest about what's actually happening: injectAnomalies() (same call
+    // as every other case) adds practice irregularities on top of these
+    // real values below -- this is not a claim that something was already
+    // wrong in the player's own data before it got here.
+    brief: "Your own imported dataset, with practice irregularities worked into its real shape. Find what looks out of place.",
     label: 'Value',
     unit: unit || 'count',
     difficulty,

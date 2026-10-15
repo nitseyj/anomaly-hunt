@@ -1,0 +1,40 @@
+.reveal {
+  margin-top: var(--space-6);
+}
+
+.stampRow {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+
+.revealGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.compareWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.compareTitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.nextRow {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .revealGrid {
+    grid-template-columns: 1fr;
+  }
+}

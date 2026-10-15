@@ -11,6 +11,42 @@ look the same, and no server ever sees your data.
 
 **[Play the live demo →](#)** *(add your GitHub Pages link here after deploying)*
 
+![Home screen — the case manifest, with a themed photo banner and the three modes listed as open cases](docs/screenshots/home.png)
+
+### At a glance
+
+- **Three modes, one shared engine** — Anomaly Hunt (timed), Forecast
+  Call (untimed MCQ), Daily Challenge (one shared case a day) — plus a
+  fourth way in: bring your own CSV/JSON instead of a generated case.
+- **No backend, ever.** Every case is generated in your browser; your
+  profile, rank, and match history live in `localStorage` only. Nothing
+  you do here is ever sent anywhere.
+- **Real statistics, not flavor text.** Three transparent anomaly
+  detectors and a genuine precision/recall/F1 comparison against your
+  own picks — see [`docs/methodology.md`](docs/methodology.md) for the
+  reasoning behind every scoring and detection rule.
+- **Tested and hardened**, not just demoed — a Vitest suite covers the
+  engine layer (including regression tests for two real, measured bugs
+  from development), CI runs that suite before every deploy, and the
+  shipped page carries a strict Content-Security-Policy with zero
+  relaxations.
+- **Keyboard-accessible.** The chart itself — the core interaction — is
+  fully operable without a mouse, with live-region announcements for
+  screen readers.
+
+### Contents
+
+- [Look and feel](#look-and-feel)
+- [Three investigations, one engine](#three-investigations-one-engine)
+- [The interaction](#the-interaction)
+- [How it works](#how-it-works)
+- [Testing, reliability & security](#testing-reliability--security)
+- [Repo structure](#repo-structure)
+- [Getting started](#getting-started)
+- [Known limitations](#known-limitations)
+- [Roadmap / good first issues](#roadmap--good-first-issues)
+- [License](#license)
+
 ## Look and feel
 
 The whole app is framed as a fictional "Field Investigations Unit": a
@@ -46,6 +82,8 @@ run against the same data, with a real precision/recall/F1 "Human vs
 Machine" table — your score computed with the exact same methodology as
 the detectors, not a different metric dressed up to look comparable.
 
+![Anomaly Hunt mid-case — darts flagged on a trend-break and level-shift, with the day-over-day delta strip below the chart](docs/screenshots/anomaly-hunt-gameplay.png)
+
 ### 📈 Forecast Call
 Five rounds, no timer. See a real trend with the final stretch hidden,
 then answer a multiple-choice question about what happens next —
@@ -57,6 +95,8 @@ you stake a confidence level (low/medium/high) that amplifies **both**
 the reward for being right and the penalty for being wrong — the game
 is testing calibrated judgement, not just correctness.
 
+![Forecast Call — a friendly ghost standing in an illustrated fog bank over the hidden tail of the trend, with the MCQ options below](docs/screenshots/forecast-call.png)
+
 ### 📅 Daily Challenge
 One deterministic, date-seeded Anomaly Hunt case shared by everyone who
 plays that day — the calendar date itself is the random seed, so no
@@ -66,8 +106,12 @@ backend or server-assigned puzzle is needed. One attempt per local day.
 Anomaly Hunt doesn't have to run on a procedurally-generated case — drop
 in your own CSV or JSON file (date + numeric value columns, flexible
 column-name aliases, tolerant of messy real-world exports including
-quoted/thousands-separated numbers) and investigate your own series
-instead, scored the same way as a generated case. Everything stays in
+quoted/thousands-separated numbers, capped at 5 MB) and the unit builds
+a case on your real shape instead of a template. To be precise about
+what that means: practice irregularities still get woven into your real
+values the same way every other case is built — this isn't a tool for
+surfacing anomalies that may already be in your data, it's your own
+realistic baseline standing in for a template's. Everything stays in
 your browser; nothing is uploaded anywhere.
 
 ### Progression
@@ -80,6 +124,8 @@ a live projection of the history log, never stored separately, so it can
 never drift out of sync. History and local-only "personal best" boards
 (`leaderboard.js`) live entirely in `localStorage`; clearing it from the
 History screen gives you a clean slate.
+
+![Profile screen — rank progress bar and the per-anomaly-type detection skill radar chart](docs/screenshots/profile.png)
 
 ## The interaction
 
@@ -116,7 +162,9 @@ wouldn't reach a screen-reader user.
 4. Finish all rounds and the session score is broken down case by case,
    then logged to your local match history.
 
-## Testing & reliability
+![Case review — the accuracy/penalty/speed-bonus breakdown next to the Human vs Machine precision/recall/F1 comparison table](docs/screenshots/anomaly-hunt-reveal.png)
+
+## Testing, reliability & security
 
 ```bash
 cd web
@@ -124,11 +172,12 @@ npm test          # run the suite once
 npm run test:watch
 ```
 
-The engine layer (`web/src/engine/*.js`) — the part that actually has to
-be statistically correct — has a [Vitest](https://vitest.dev) suite
-covering every module, including two regression tests for defects that
-were real, measured bugs during development and are exactly the kind of
-thing that could silently reappear without a test catching them:
+**Tested.** The engine layer (`web/src/engine/*.js`) — the part that
+actually has to be statistically correct — has a
+[Vitest](https://vitest.dev) suite covering every module, including two
+regression tests for defects that were real, measured bugs during
+development and are exactly the kind of thing that could silently
+reappear without a test catching them:
 
 - **Self-inclusion bias in the rolling detectors** — a hand-computed
   scenario asserting a window never lets the point under test vouch for
@@ -138,10 +187,25 @@ thing that could silently reappear without a test catching them:
   answer band can never collapse to a degenerate zero-width option on a
   metric pinned near its own floor.
 
-Each screen is also lazy-loaded (`React.lazy`) and wrapped in an error
-boundary, so a screen that fails to load — or throws — shows a small
-in-theme recovery panel with a way back to Home instead of a blank
-white screen.
+The GitHub Actions deploy workflow runs this suite before every build —
+a failing test blocks the deploy, it doesn't just sit unread locally.
+
+**Resilient.** Each screen is lazy-loaded (`React.lazy`) and wrapped in
+an error boundary, so a screen that fails to load — or throws — shows a
+small in-theme recovery panel with a way back to Home instead of a
+blank white screen.
+
+**Hardened.** The shipped page carries a strict
+[Content-Security-Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
+(`default-src 'self'`, no `unsafe-inline`, no `unsafe-eval`) as
+defense-in-depth — there's no known XSS vector in the app today (no
+`dangerouslySetInnerHTML`, `eval`, or raw `innerHTML` anywhere; every
+user-facing string renders through React's auto-escaping JSX), but the
+policy means a future regression would be blocked rather than exploited.
+The CSV/JSON import path is capped at 5 MB to stop an oversized or
+mis-selected file from freezing the tab, and the hand-rolled CSV parser
+walks the string char-by-char rather than using regex, so there's no
+ReDoS surface there either.
 
 ## Repo structure
 
@@ -157,9 +221,10 @@ anomaly-hunt/
 │   │   ├── case.js                     # builds one playable round from a template or imported data
 │   │   ├── daily.js                    # date-seeded deterministic Daily Challenge
 │   │   ├── forecast.js                 # Forecast Call: builds the MCQ + distractors
-│   │   ├── dataImport.js               # parses an imported CSV/JSON series (quote-aware)
+│   │   ├── dataImport.js               # parses an imported CSV/JSON series (quote-aware, 5 MB capped)
 │   │   ├── profile.js / leaderboard.js / history.js   # localStorage persistence
-│   │   └── *.test.js                   # vitest coverage for every file above — see Testing below
+│   │   ├── useFlagging.js / useCountdownTimer.js   # shared hooks behind Anomaly Hunt + Daily Challenge
+│   │   └── *.test.js                   # vitest coverage for every file above — see Testing, reliability & security below
 │   ├── src/charts/                     # hand-rolled d3-scale/d3-shape charts, no chart library
 │   │   ├── useChartScales.js           # the ONE exact-domain scale every marker shares
 │   │   ├── AnomalyChart.jsx            # press-drag-release dart (+ full keyboard path), detector overlay
@@ -169,6 +234,7 @@ anomaly-hunt/
 │   ├── src/components/                 # shared design-system pieces (Button, Card, Pill, …)
 │   │   ├── AppShell.jsx                # persistent sidebar + ambient background, mounted once
 │   │   ├── ReadyGate.jsx               # the "read the brief, then start" pause before a round
+│   │   ├── CaseRevealPanel.jsx         # the shared "case closed" block (stamp, breakdown, detector table)
 │   │   ├── PageShell.jsx               # per-screen header, incl. the photo case-file banner
 │   │   ├── ConfirmDialog.jsx / CommandPalette.jsx / ToastHub.jsx   # modal, ⌘K palette, achievement toasts
 │   │   └── ErrorBoundary.jsx / ScreenLoader.jsx   # per-screen crash/chunk-load recovery + lazy-load fallback
@@ -225,7 +291,11 @@ repo's Settings → Pages → Source: GitHub Actions).
   (Forecast Call)** are fixed values, not tuned per metric or per
   player.
 - **Profile, history, and personal bests are local to one browser**
-  (`localStorage`) — no identity, no cross-device sync.
+  (`localStorage`) — no identity, no cross-device sync. Note that
+  `localStorage` is scoped per *origin*, not per repo: if you deploy
+  other projects to GitHub Pages under the same account, they share
+  this same storage namespace (keys here are prefixed `ah2-` to avoid
+  accidental collisions, but that's not isolation).
 - Forecast Call always forecasts the same fixed fraction of the series —
   no adjustable forecast horizon yet.
 

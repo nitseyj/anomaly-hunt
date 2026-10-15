@@ -1,5 +1,6 @@
 {
   "name": "anomaly-hunt",
+  "description": "A client-side field-investigations game for practicing anomaly detection, forecasting, and statistical judgement against procedurally generated business data -- no backend, no account, nothing leaves your browser.",
   "private": true,
   "version": "2.0.0",
   "type": "module",

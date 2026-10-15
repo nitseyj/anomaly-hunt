@@ -117,3 +117,22 @@ export function runAllDetectors(values, groundTruthAnomalies) {
   });
   return { scores, flagsByDetector, combinedFlags };
 }
+
+/**
+ * Turns a scoreAnomalyHunt() result into the same {precision, recall, f1}
+ * shape evaluateFlags() produces for the statistical detectors, so the
+ * player's own row in the "Human vs Machine" table is computed by the
+ * same lens as every other row, not a different metric dressed up to
+ * look comparable. Was duplicated identically in both AnomalyHunt and
+ * DailyChallenge screens before living here.
+ */
+export function evaluateHumanResult(result) {
+  if (!result) return { precision: 0, recall: 0, f1: 0 };
+  const tp = result.anomaliesFound;
+  const fp = result.falseAlarms;
+  const fn = result.anomaliesMissed;
+  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+  return { precision, recall, f1 };
+}

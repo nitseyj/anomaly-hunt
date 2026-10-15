@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { PageShell } from '../../components/PageShell.jsx';
 import { ObservationPanel } from '../../components/ObservationPanel.jsx';
 import { ReadyGate } from '../../components/ReadyGate.jsx';
+import { CaseRevealPanel } from '../../components/CaseRevealPanel.jsx';
 import { AnomalyChart } from '../../charts/AnomalyChart.jsx';
 import { Button } from '../../components/Button.jsx';
 import { Pill } from '../../components/Pill.jsx';
-import { DataTable } from '../../components/DataTable.jsx';
 import { ResultBreakdown } from '../../components/ResultBreakdown.jsx';
 import { StampBadge } from '../../components/StampBadge.jsx';
-import { Confetti } from '../../components/Confetti.jsx';
 import { getTodayChallenge, getTodayResult, saveTodayResult, msUntilNextDaily } from '../../engine/daily.js';
 import { scoreAnomalyHunt, TIME_LIMIT_SECONDS, MAX_FLAGS_PER_CASE } from '../../engine/scoring.js';
-import { runAllDetectors, DETECTOR_META } from '../../engine/detectors.js';
+import { runAllDetectors } from '../../engine/detectors.js';
+import { useFlagging } from '../../engine/useFlagging.js';
+import { useCountdownTimer } from '../../engine/useCountdownTimer.js';
 import { addHistoryEntry } from '../../engine/history.js';
 import { getProfile } from '../../engine/profile.js';
 import { pushToast } from '../../engine/toastBus.js';
@@ -48,54 +49,27 @@ export function DailyChallenge({ onNavigate }) {
   const existingResult = useMemo(() => getTodayResult(), []);
   const profile = useMemo(() => getProfile(), []);
 
-  const [flags, setFlags] = useState([]);
-  const [secondsLeft, setSecondsLeft] = useState(TIME_LIMIT_SECONDS);
   const [revealed, setRevealed] = useState(Boolean(existingResult));
   const [result, setResult] = useState(existingResult?.score ?? null);
   const [detectorData, setDetectorData] = useState(null);
   // A past (or already-revealed) attempt has nothing left to "start" --
   // only a fresh attempt goes through the ReadyGate.
   const [started, setStarted] = useState(Boolean(existingResult));
-  const timerRef = useRef(null);
 
-  useEffect(() => () => clearInterval(timerRef.current), []);
+  const { flags, yGuessMap, placeFlag, removeFlag } = useFlagging();
+  const timer = useCountdownTimer(TIME_LIMIT_SECONDS, () => {
+    if (!revealed) handleReveal();
+  });
 
   function beginChallenge() {
     setStarted(true);
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(timerRef.current);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-  }
-
-  useEffect(() => {
-    if (secondsLeft === 0 && !revealed) handleReveal();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsLeft]);
-
-  const yGuessMap = useMemo(() => {
-    const map = {};
-    flags.forEach((f) => (map[f.index] = f.value));
-    return map;
-  }, [flags]);
-
-  function handlePlaceFlag(index, value) {
-    setFlags((prev) => (prev.length >= MAX_FLAGS_PER_CASE ? prev : [...prev, { index, value }]));
-  }
-
-  function handleRemoveFlag(index) {
-    setFlags((prev) => prev.filter((f) => f.index !== index));
+    timer.start();
   }
 
   function handleReveal() {
-    clearInterval(timerRef.current);
+    timer.stop();
     const values = challenge.series.map((p) => p.value);
-    const scoreResult = scoreAnomalyHunt(flags.map((f) => f.index), challenge.groundTruth, secondsLeft, challenge.series, yGuessMap);
+    const scoreResult = scoreAnomalyHunt(flags.map((f) => f.index), challenge.groundTruth, timer.secondsLeft, challenge.series, yGuessMap);
     const detectors = runAllDetectors(values, challenge.groundTruth);
     setResult(scoreResult);
     setDetectorData(detectors);
@@ -121,13 +95,6 @@ export function DailyChallenge({ onNavigate }) {
       pushToast({ title: 'Strong Case Work', detail: `+${scoreResult.points} points` });
     }
   }
-
-  const detectorRows = detectorData
-    ? [
-        { key: 'human', method: 'You', ...pseudoHumanEval(result) },
-        ...Object.entries(detectorData.scores).map(([key, s]) => ({ key, method: DETECTOR_META[key].label, ...s })),
-      ]
-    : [];
 
   async function handleExit() {
     if (!revealed && flags.length > 0) {
@@ -161,7 +128,7 @@ export function DailyChallenge({ onNavigate }) {
         <div className={sharedStyles.timerWrap}>
           <Button variant="ghost" size="sm" onClick={handleExit}>Exit</Button>
           {profile.dailyStreak > 0 && <Pill tone="signal">{profile.dailyStreak}-day streak</Pill>}
-          {started && !revealed && <span className={`${sharedStyles.timerValue} ${secondsLeft <= 10 ? sharedStyles.timerUrgent : ''}`}>{secondsLeft}s</span>}
+          {started && !revealed && <span className={`${sharedStyles.timerValue} ${timer.secondsLeft <= 10 ? sharedStyles.timerUrgent : ''}`}>{timer.secondsLeft}s</span>}
         </div>
       }
     >
@@ -206,8 +173,8 @@ export function DailyChallenge({ onNavigate }) {
               unit={challenge.unit}
               flags={flags}
               maxFlags={MAX_FLAGS_PER_CASE}
-              onPlaceFlag={handlePlaceFlag}
-              onRemoveFlag={handleRemoveFlag}
+              onPlaceFlag={placeFlag}
+              onRemoveFlag={removeFlag}
               groundTruth={challenge.groundTruth}
               revealed={revealed}
               detectorFlags={detectorData?.combinedFlags}
@@ -226,62 +193,15 @@ export function DailyChallenge({ onNavigate }) {
         </>
       )}
 
-      <AnimatePresence>
-        {revealed && result && detectorData && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={sharedStyles.reveal}>
-            <div className={sharedStyles.stampRow}>
-              <StampBadge
-                text={result.anomaliesMissed === 0 && result.falseAlarms === 0 ? 'Clean Sweep' : result.points >= 60 ? 'Case Closed' : 'Needs Review'}
-                tone={result.points >= 60 ? 'signal' : 'warn'}
-              />
-              {result.points >= 80 && <Confetti />}
-            </div>
-
-            <div className={sharedStyles.revealGrid}>
-              <ResultBreakdown
-                total={result.points}
-                rows={[
-                  { label: 'Accuracy', value: result.accuracyPoints },
-                  { label: 'False alarm penalty', value: -result.falseAlarmPenalty },
-                  { label: 'Speed bonus', value: result.speedBonus },
-                ]}
-              />
-              {detectorData && (
-                <div className={sharedStyles.compareWrap}>
-                  <h4 className={sharedStyles.compareTitle}>Human vs. Machine</h4>
-                  <DataTable
-                    highlightRowIndex={0}
-                    columns={[
-                      { key: 'method', label: 'Method' },
-                      { key: 'precision', label: 'Precision', render: (r) => r.precision.toFixed(2) },
-                      { key: 'recall', label: 'Recall', render: (r) => r.recall.toFixed(2) },
-                      { key: 'f1', label: 'F1', render: (r) => r.f1.toFixed(2) },
-                    ]}
-                    rows={detectorRows}
-                  />
-                </div>
-              )}
-            </div>
-
-            <NextCaseCountdown />
-
-            <div className={sharedStyles.nextRow}>
-              <Button variant="primary" onClick={() => onNavigate('home', { skipGuard: true })}>Back to home</Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {revealed && result && detectorData && (
+        <CaseRevealPanel
+          result={result}
+          detectorData={detectorData}
+          footer={<Button variant="primary" onClick={() => onNavigate('home', { skipGuard: true })}>Back to home</Button>}
+        >
+          <NextCaseCountdown />
+        </CaseRevealPanel>
+      )}
     </PageShell>
   );
-}
-
-function pseudoHumanEval(result) {
-  if (!result) return { precision: 0, recall: 0, f1: 0 };
-  const tp = result.anomaliesFound;
-  const fp = result.falseAlarms;
-  const fn = result.anomaliesMissed;
-  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
-  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
-  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-  return { precision, recall, f1 };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rollingZScoreDetect, rollingIqrDetect, weeklySeasonalDiffDetect, evaluateFlags, runAllDetectors, DETECTOR_META } from './detectors.js';
+import { rollingZScoreDetect, rollingIqrDetect, weeklySeasonalDiffDetect, evaluateFlags, runAllDetectors, evaluateHumanResult, DETECTOR_META } from './detectors.js';
 
 describe('rollingZScoreDetect', () => {
   it('flags an obvious spike against a flat baseline', () => {
@@ -143,6 +143,25 @@ describe('evaluateFlags', () => {
     flags[12] = true; // within tolerance=3 but not the exact index
     const { recall } = evaluateFlags(flags, groundTruth, 3);
     expect(recall).toBe(1);
+  });
+});
+
+describe('evaluateHumanResult', () => {
+  it('matches evaluateFlags\' precision/recall/f1 shape for a perfect result', () => {
+    const result = { anomaliesFound: 2, falseAlarms: 0, anomaliesMissed: 0 };
+    expect(evaluateHumanResult(result)).toEqual({ precision: 1, recall: 1, f1: 1 });
+  });
+
+  it('computes precision/recall from found/false-alarm/missed counts, not from raw flags', () => {
+    const result = { anomaliesFound: 1, falseAlarms: 1, anomaliesMissed: 1 };
+    const { precision, recall, f1 } = evaluateHumanResult(result);
+    expect(precision).toBeCloseTo(0.5);
+    expect(recall).toBeCloseTo(0.5);
+    expect(f1).toBeCloseTo(0.5);
+  });
+
+  it('returns zeros for a null result instead of throwing (e.g. before any round has been revealed)', () => {
+    expect(evaluateHumanResult(null)).toEqual({ precision: 0, recall: 0, f1: 0 });
   });
 });
 

@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070c" />
+    <!--
+      The Content-Security-Policy meta tag is injected by vite.config.js
+      (an `apply: 'build'` plugin) -- NOT hardcoded here -- because Vite's
+      dev server injects CSS Modules via literal inline <style> tags
+      (fast HMR), which a strict style-src blocks outright, while the
+      production build extracts CSS to real .css files that same policy
+      is fine with. Putting the CSP here would silently break `npm run
+      dev` entirely (every CSS Module fails to apply, no console warning
+      beyond a CSP violation easy to miss) while only being validated
+      against the production build. See vite.config.js for the policy
+      itself and the reasoning behind each directive.
+    -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,14 +26,20 @@
     <title>Anomaly Hunt — Field Investigations Unit</title>
     <meta
       name="description"
-      content="An open-source field-investigations game for practicing real BI/analytics skills: spotting anomalies in business data, forecasting where a trend goes next, and comparing your own judgement to real statistical methods."
+      content="An open-source field-investigations game for practicing real BI/analytics skills: spot injected anomalies, forecast where a trend goes next, and compare your judgement to real statistical detectors. Procedurally generated, keyboard-accessible, bring your own CSV/JSON — nothing ever leaves your browser."
     />
     <meta property="og:title" content="Anomaly Hunt — Field Investigations Unit" />
     <meta
       property="og:description"
-      content="Spot anomalies in business data, forecast the trend, and compare your judgment to real statistical detectors — procedurally generated, no two cases alike."
+      content="Spot anomalies in business data, forecast the trend, and compare your judgment to real statistical detectors — procedurally generated, no two cases alike, nothing leaves your browser."
     />
     <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Anomaly Hunt — Field Investigations Unit" />
+    <meta
+      name="twitter:description"
+      content="A client-side game for practicing anomaly detection and forecasting against real statistical methods. No backend, no account."
+    />
   </head>
   <body>
     <div id="root"></div>
