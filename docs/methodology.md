@@ -149,6 +149,33 @@ browsing the chart, and without a cap, repeatedly flagging while
 exploring could silently rack up dozens of flags with no analytical
 value and no warning.
 
+## Survival mode: a continuous difficulty ramp
+
+Survival mode (`web/src/screens/Survival/`) needed difficulty to keep
+escalating wave over wave, but the named tiers everything else uses
+(`easy`/`medium`/`hard` in `anomalies.js`) top out at `hard` with
+nowhere further to go. `survivalSettingsForWave(wave)` computes a
+settings object of the same shape directly instead of picking a named
+tier — `injectAnomalies()` accepts either — interpolating anomaly count,
+magnitude, and how obvious the anomaly's floor-level size is, from
+roughly `easy` at wave 1 toward a level tougher than `hard` by wave 13.
+
+**A design choice worth being upfront about, same as the other ones on
+this page**: the ramp *holds* at that wave-13 ceiling rather than
+escalating forever. An endless mode that keeps intensifying without
+bound doesn't get more interesting as it approaches infinity — it just
+gets to a guaranteed loss sooner, which is a worse experience than a
+tough-but-stable plateau a skilled player can actually sustain. This is
+a hand-tuned curve, not something derived from real player data on what
+difficulty is actually fair at a given wave — see the README's Known
+Limitations section for that caveat stated plainly.
+
+Everything else about a Survival wave — scoring, the three detectors,
+the Human vs Machine comparison, the reveal screen — is the exact same
+pipeline as a regular Anomaly Hunt case. Only how the case's difficulty
+is chosen differs; a wave is still built and judged identically to any
+other round.
+
 ## Forecast Call: how the MCQ is generated
 
 Forecast Call doesn't ask for a free-text prediction — it's a multiple-
@@ -209,15 +236,19 @@ analytical judgement the way it might for spotting an obvious outlier.
 
 Every correctness-critical claim on this page has a corresponding
 Vitest test in `web/src/engine/*.test.js` (`npm test` from `web/`) — in
-particular, the self-inclusion exclusion in the detectors and the
-Forecast Call band-width floor are both regression-tested against the
-exact failure mode described above, not just asserted in prose.
+particular, the self-inclusion exclusion in the detectors, the Forecast
+Call band-width floor, and the zero-deviation-at-the-flagged-point
+guarantee for `trend_break`/`volatility_spike` are all regression-tested
+against the exact failure mode described above, not just asserted in
+prose. Survival's difficulty ramp has its own coverage too — that it
+actually escalates, and that it holds steady past the wave-13 ceiling
+instead of continuing to climb.
 
 ## Extending this project
 
 - Add a new anomaly type by extending `web/src/engine/anomalies.js`
 - Add a new business-metric template to `metrics.js`'s
-  `METRIC_TEMPLATES` array — all three modes pick it up automatically
+  `METRIC_TEMPLATES` array — all four modes pick it up automatically
 - Add a new detection method by extending `detectors.js`
 - Add a new question type to Forecast Call by extending `forecast.js`'s
   `FORECAST_QUESTION_TYPES` and its matching builder function
