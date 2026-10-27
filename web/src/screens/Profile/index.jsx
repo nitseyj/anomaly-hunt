@@ -2,13 +2,16 @@ import { PageShell } from '../../components/PageShell.jsx';
 import { Card } from '../../components/Card.jsx';
 import { Stat } from '../../components/Stat.jsx';
 import { RankLadder } from '../../components/RankLadder.jsx';
+import { Button } from '../../components/Button.jsx';
 import { RadarSkillChart } from '../../charts/RadarSkillChart.jsx';
-import { getProfile } from '../../engine/profile.js';
+import { getProfile, weakestSkillType } from '../../engine/profile.js';
+import { ANOMALY_TYPE_SHORT_LABELS } from '../../engine/anomalies.js';
 import heroPhoto from '../../assets/photos/profile-milkyway.jpg';
 import styles from './styles.module.css';
 
-export function Profile() {
+export function Profile({ onStartPractice }) {
   const profile = getProfile();
+  const practiceTarget = weakestSkillType(profile);
 
   return (
     <PageShell
@@ -36,11 +39,19 @@ export function Profile() {
         <Stat label="Forecast accuracy" value={Math.round(profile.forecastAccuracy * 100)} suffix="%" />
         <Stat label="Best forecast streak" value={profile.bestForecastStreak} />
         <Stat label="Daily streak" value={profile.dailyStreak} suffix=" days" />
+        <Stat label="Best survival wave" value={profile.bestSurvivalWave} />
       </Card>
 
       <Card className={styles.skillsCard}>
         <h3 className={styles.sectionTitle}>Detection skill by anomaly type</h3>
         <RadarSkillChart skills={profile.skills} />
+        {practiceTarget && (
+          <div className={styles.practiceRow}>
+            <Button variant="ghost" onClick={() => onStartPractice?.(practiceTarget)}>
+              Practice {ANOMALY_TYPE_SHORT_LABELS[practiceTarget]} →
+            </Button>
+          </div>
+        )}
       </Card>
     </PageShell>
   );

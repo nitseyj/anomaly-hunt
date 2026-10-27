@@ -1,0 +1,8 @@
+.band {
+  fill: var(--accent-info);
+  opacity: 0.1;
+  stroke: var(--accent-info);
+  stroke-width: 1;
+  stroke-opacity: 0.25;
+  pointer-events: none;
+}

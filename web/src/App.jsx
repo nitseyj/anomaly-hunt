@@ -19,13 +19,14 @@ import { requestConfirm } from './engine/confirmBus.js';
 // etc.) to a default export just for this.
 const Home = lazy(() => import('./screens/Home/index.jsx').then((m) => ({ default: m.Home })));
 const AnomalyHunt = lazy(() => import('./screens/AnomalyHunt/index.jsx').then((m) => ({ default: m.AnomalyHunt })));
+const Survival = lazy(() => import('./screens/Survival/index.jsx').then((m) => ({ default: m.Survival })));
 const ForecastCall = lazy(() => import('./screens/ForecastCall/index.jsx').then((m) => ({ default: m.ForecastCall })));
 const DailyChallenge = lazy(() => import('./screens/DailyChallenge/index.jsx').then((m) => ({ default: m.DailyChallenge })));
 const Profile = lazy(() => import('./screens/Profile/index.jsx').then((m) => ({ default: m.Profile })));
 const History = lazy(() => import('./screens/History/index.jsx').then((m) => ({ default: m.History })));
 const Import = lazy(() => import('./screens/Import/index.jsx').then((m) => ({ default: m.Import })));
 
-const LIVE_SCREENS = ['anomaly', 'forecast', 'daily'];
+const LIVE_SCREENS = ['anomaly', 'forecast', 'daily', 'survival'];
 
 // A horizontal swoosh instead of a plain fade: the new screen sweeps in
 // from the left (the same direction the sidebar nav sits in, and the
@@ -54,6 +55,7 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const [importedSeries, setImportedSeries] = useState(null);
   const [importedMeta, setImportedMeta] = useState(null);
+  const [practiceType, setPracticeType] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export default function App() {
     if (next !== 'anomaly') {
       setImportedSeries(null);
       setImportedMeta(null);
+      setPracticeType(null);
     }
     setScreen(next);
   }
@@ -104,6 +107,14 @@ export default function App() {
   function startImported(series, meta) {
     setImportedSeries(series);
     setImportedMeta(meta);
+    setPracticeType(null);
+    setScreen('anomaly');
+  }
+
+  function startPractice(type) {
+    setPracticeType(type);
+    setImportedSeries(null);
+    setImportedMeta(null);
     setScreen('anomaly');
   }
 
@@ -113,10 +124,19 @@ export default function App() {
 
   const screens = {
     home: <Home onNavigate={navigate} />,
-    anomaly: <AnomalyHunt key={importedSeries ? 'imported' : 'random'} onNavigate={navigate} importedSeries={importedSeries} importedMeta={importedMeta} />,
+    anomaly: (
+      <AnomalyHunt
+        key={importedSeries ? 'imported' : practiceType ? `practice-${practiceType}` : 'random'}
+        onNavigate={navigate}
+        importedSeries={importedSeries}
+        importedMeta={importedMeta}
+        practiceType={practiceType}
+      />
+    ),
     forecast: <ForecastCall onNavigate={navigate} />,
     daily: <DailyChallenge onNavigate={navigate} />,
-    profile: <Profile onNavigate={navigate} />,
+    survival: <Survival onNavigate={navigate} />,
+    profile: <Profile onNavigate={navigate} onStartPractice={startPractice} />,
     history: <History onNavigate={navigate} />,
     import: <Import onNavigate={navigate} onStartImported={startImported} />,
   };

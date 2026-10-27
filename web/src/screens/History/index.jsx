@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PageShell } from '../../components/PageShell.jsx';
 import { Button } from '../../components/Button.jsx';
-import { AnomalyIcon, ForecastIcon, DailyIcon, IconBadge } from '../../components/ModeIcon.jsx';
+import { AnomalyIcon, ForecastIcon, DailyIcon, SurvivalIcon, IconBadge } from '../../components/ModeIcon.jsx';
 import { getHistory, clearHistory } from '../../engine/history.js';
 import { requestConfirm } from '../../engine/confirmBus.js';
 import heroPhoto from '../../assets/photos/history-typewriter.jpg';
@@ -12,6 +12,7 @@ const MODE_META = {
   anomaly_hunt: { label: 'Anomaly Hunt', Icon: AnomalyIcon },
   forecast_call: { label: 'Forecast Call', Icon: ForecastIcon },
   daily_challenge: { label: 'Daily Challenge', Icon: DailyIcon },
+  survival: { label: 'Survival', Icon: SurvivalIcon },
 };
 
 const FILTERS = [
@@ -19,6 +20,7 @@ const FILTERS = [
   { id: 'anomaly_hunt', label: 'Anomaly Hunt' },
   { id: 'forecast_call', label: 'Forecast Call' },
   { id: 'daily_challenge', label: 'Daily Challenge' },
+  { id: 'survival', label: 'Survival' },
 ];
 
 export function History({ onNavigate }) {

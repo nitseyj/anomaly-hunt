@@ -21,6 +21,12 @@
   margin-bottom: var(--space-4);
 }
 
+.practiceRow {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
 @media (max-width: 640px) {
   .statsCard {
     grid-template-columns: repeat(2, 1fr);

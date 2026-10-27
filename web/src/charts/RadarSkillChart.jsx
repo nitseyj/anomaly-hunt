@@ -16,6 +16,7 @@ const AXES = [
   { key: 'levelShift', label: 'Level Shifts' },
   { key: 'missingGap', label: 'Missing Gaps' },
   { key: 'trendBreak', label: 'Trend Breaks' },
+  { key: 'volatilitySpike', label: 'Volatility Spikes' },
 ];
 
 const SIZE = 280;
@@ -61,11 +62,15 @@ export function RadarSkillChart({ skills }) {
       {angles.map((a, i) => {
         const labelPos = pointFor(a, 1.3);
         const skill = skills[AXES[i].key];
-        // A centered label on the left/right axis (angle 180/0) extends
+        // A centered label on a mostly-left or mostly-right axis extends
         // half its width past the viewBox edge and gets clipped -- grow
         // those labels inward (toward center) instead of symmetrically.
-        const normalizedAngle = ((a % 360) + 360) % 360;
-        const anchor = normalizedAngle === 0 ? 'end' : normalizedAngle === 180 ? 'start' : 'middle';
+        // Keyed off cos(angle) rather than an exact 0/180 match: with N
+        // axes evenly spaced, only N=4 ever lands exactly on a cardinal
+        // angle -- 5 axes puts labels at -18/126/198 degrees, close
+        // enough to horizontal to clip just the same without this.
+        const cos = Math.cos((a * Math.PI) / 180);
+        const anchor = cos > 0.3 ? 'end' : cos < -0.3 ? 'start' : 'middle';
         return (
           <g key={i}>
             <text x={labelPos.x} y={labelPos.y - 4} textAnchor={anchor} className={styles.axisLabel}>

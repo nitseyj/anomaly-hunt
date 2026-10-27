@@ -34,7 +34,9 @@ import { scaleLinear } from 'd3-scale';
 import { useChartScales } from './useChartScales.js';
 import { ChartGrid } from './ChartGrid.jsx';
 import { SeriesPath } from './SeriesPath.jsx';
+import { RollingBand } from './RollingBand.jsx';
 import { CornerBrackets } from '../components/CornerBrackets.jsx';
+import { Button } from '../components/Button.jsx';
 import { formatValue } from '../engine/metrics.js';
 import styles from './AnomalyChart.module.css';
 
@@ -56,13 +58,22 @@ export function AnomalyChart({
   groundTruth = null,
   revealed = false,
   detectorFlags = null,
+  rollingBandStats = null,
+  visibleCount = null,
   disabled = false,
 }) {
   const svgRef = useRef(null);
   const wrapRef = useRef(null);
+  // The axis domain always comes from the FULL series, even in live-replay
+  // mode where only `visibleCount` days are drawn -- a stable axis isolates
+  // "can you still catch it without seeing the ending" from a separate,
+  // noisier skill (coping with a y-axis that jumps as new points arrive).
   const { xScale, yScale, padding } = useChartScales(series, { width: WIDTH, height: HEIGHT, padding: 64 });
   const [hover, setHover] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [showBand, setShowBand] = useState(false);
+  const maxIndex = visibleCount != null ? Math.min(visibleCount, series.length) - 1 : series.length - 1;
+  const visibleSeries = visibleCount != null ? series.slice(0, visibleCount) : series;
 
   const rawDartX = useMotionValue(0);
   const rawDartY = useMotionValue(0);
@@ -70,7 +81,12 @@ export function AnomalyChart({
   const dartY = useSpring(rawDartY, { stiffness: 420, damping: 32 });
 
   const deltas = series.map((p, i) => (i === 0 ? 0 : p.value - series[i - 1].value));
-  const maxAbsDelta = Math.max(...deltas.map(Math.abs)) || 1;
+  // Scaled off only what's actually visible -- in live-replay mode, sizing
+  // this against the FULL series' deltas would leak a tell about days not
+  // revealed yet (e.g. bars reading unusually small/compressed because a
+  // much bigger move is coming later in the case).
+  const visibleDeltas = visibleCount != null ? deltas.slice(0, visibleCount) : deltas;
+  const maxAbsDelta = Math.max(...visibleDeltas.map(Math.abs)) || 1;
   const deltaScale = scaleLinear().domain([-maxAbsDelta, maxAbsDelta]).range([DELTA_TOP + DELTA_HEIGHT, DELTA_TOP]);
   const barWidth = Math.max(1.5, (xScale(1) - xScale(0)) * 0.6);
 
@@ -85,11 +101,11 @@ export function AnomalyChart({
   const nearestFromLocal = useCallback(
     (local) => {
       const rawIndex = xScale.invert(local.x);
-      const idx = Math.max(0, Math.min(series.length - 1, Math.round(rawIndex)));
+      const idx = Math.max(0, Math.min(maxIndex, Math.round(rawIndex)));
       const value = yScale.invert(local.y);
       return { idx, value };
     },
-    [xScale, yScale, series.length]
+    [xScale, yScale, maxIndex]
   );
 
   const canThrow = !disabled && flags.length < maxFlags;
@@ -112,7 +128,7 @@ export function AnomalyChart({
       e.preventDefault();
       const delta = e.key === 'ArrowRight' ? 1 : -1;
       const base = hover ? hover.idx : 0;
-      const idx = Math.max(0, Math.min(series.length - 1, base + delta));
+      const idx = Math.max(0, Math.min(maxIndex, base + delta));
       setHover({ idx, value: series[idx].value });
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -179,7 +195,8 @@ export function AnomalyChart({
         style={{ cursor: disabled ? 'default' : flags.length >= maxFlags ? 'not-allowed' : 'crosshair' }}
       >
         <ChartGrid xScale={xScale} yScale={yScale} series={series} width={WIDTH} height={HEIGHT} unit={unit} formatValue={formatValue} />
-        <SeriesPath series={series} xScale={xScale} yScale={yScale} />
+        {revealed && showBand && rollingBandStats && <RollingBand stats={rollingBandStats} xScale={xScale} yScale={yScale} />}
+        <SeriesPath series={visibleSeries} xScale={xScale} yScale={yScale} />
 
         {revealed &&
           groundTruth?.map((a) => (
@@ -249,7 +266,7 @@ export function AnomalyChart({
             Δ DAY-OVER-DAY
           </text>
           {deltas.map((d, i) =>
-            i === 0 ? null : (
+            i === 0 || i > maxIndex ? null : (
               <rect
                 key={i}
                 x={xScale(i) - barWidth / 2}
@@ -283,11 +300,18 @@ export function AnomalyChart({
             </span>
           </div>
         )}
-        {hover && !disabled && (
-          <span className={styles.metaItem} aria-live="polite">
-            {series[hover.idx].date} · {formatValue(series[hover.idx].value, unit)}
-            {flags.some((f) => f.index === hover.idx) ? ' · flagged' : ''}
-          </span>
+        {revealed && rollingBandStats ? (
+          <Button variant="ghost" size="sm" onClick={() => setShowBand((v) => !v)}>
+            {showBand ? 'Hide detector math' : 'Show detector math'}
+          </Button>
+        ) : (
+          hover &&
+          !disabled && (
+            <span className={styles.metaItem} aria-live="polite">
+              {series[hover.idx].date} · {formatValue(series[hover.idx].value, unit)}
+              {flags.some((f) => f.index === hover.idx) ? ' · flagged' : ''}
+            </span>
+          )
         )}
       </div>
     </div>

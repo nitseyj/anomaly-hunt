@@ -55,6 +55,15 @@ export function DailyIcon() {
   );
 }
 
+export function SurvivalIcon() {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={styles.icon}>
+      <path d="M16 4 L27 8 V15 C27 22 22 27 16 29 C10 27 5 22 5 15 V8 Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 17 L13 17 L15 13 L18 21 L20 17 L23 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+    </svg>
+  );
+}
+
 export function HomeIcon() {
   return (
     <svg viewBox="0 0 32 32" fill="none" className={styles.icon}>

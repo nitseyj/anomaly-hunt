@@ -53,6 +53,24 @@ export default defineConfig({
   plugins: [react(), productionCsp()],
   base: '/anomaly-hunt/',
   publicDir: 'public',
+  build: {
+    rollupOptions: {
+      output: {
+        // Pin react/react-dom to one explicit vendor chunk. Without this,
+        // InfoHint.jsx importing `createPortal` from the full `react-dom`
+        // package (main.jsx only ever touches the separate `react-dom/client`
+        // entry) gives Rollup's automatic chunking a new edge that makes it
+        // fold the previously-separate react vendor chunk back into the main
+        // entry bundle -- a real ~40KB gzipped regression against the
+        // code-splitting this app otherwise relies on.
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+            return 'react-vendor';
+          }
+        },
+      },
+    },
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.js'],

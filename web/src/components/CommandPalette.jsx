@@ -15,6 +15,7 @@ const DESTINATIONS = [
   { id: 'anomaly', label: 'Anomaly Hunt', hint: '5 cases · 45s each' },
   { id: 'forecast', label: 'Forecast Call', hint: '5 rounds · untimed' },
   { id: 'daily', label: 'Daily Challenge', hint: 'Today’s shared case' },
+  { id: 'survival', label: 'Survival', hint: 'Endless · escalating difficulty' },
   { id: 'profile', label: 'Profile', hint: 'Rank & stats' },
   { id: 'history', label: 'Match log', hint: 'Past investigations' },
   { id: 'import', label: 'Bring your own data', hint: 'CSV / JSON import' },

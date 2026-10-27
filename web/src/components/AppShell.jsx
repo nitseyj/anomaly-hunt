@@ -11,7 +11,7 @@
  */
 import { motion } from 'motion/react';
 import { RadarField } from './RadarField.jsx';
-import { IconBadge, HomeIcon, AnomalyIcon, ForecastIcon, DailyIcon, ProfileIcon, HistoryIcon, ImportIcon } from './ModeIcon.jsx';
+import { IconBadge, HomeIcon, AnomalyIcon, ForecastIcon, DailyIcon, SurvivalIcon, ProfileIcon, HistoryIcon, ImportIcon } from './ModeIcon.jsx';
 import { getProfile } from '../engine/profile.js';
 import { getTodayResult } from '../engine/daily.js';
 import styles from './AppShell.module.css';
@@ -21,6 +21,7 @@ const PRIMARY_NAV = [
   { id: 'anomaly', label: 'Anomaly Hunt', Icon: AnomalyIcon },
   { id: 'forecast', label: 'Forecast Call', Icon: ForecastIcon },
   { id: 'daily', label: 'Daily Challenge', Icon: DailyIcon },
+  { id: 'survival', label: 'Survival', Icon: SurvivalIcon },
 ];
 
 const SECONDARY_NAV = [

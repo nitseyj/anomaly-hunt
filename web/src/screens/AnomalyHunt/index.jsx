@@ -7,6 +7,14 @@ import { AnomalyChart } from '../../charts/AnomalyChart.jsx';
 import { Button } from '../../components/Button.jsx';
 import { ResultBreakdown } from '../../components/ResultBreakdown.jsx';
 import { generateAnomalyCase, generateCaseFromSeries, DIFFICULTY_SEQUENCE } from '../../engine/case.js';
+import { ANOMALY_TYPE_SHORT_LABELS } from '../../engine/anomalies.js';
+
+// Enough days seeded up front for the rolling detectors' windows to have
+// real data to work with (rollingIqrDetect's default window is 20;
+// windowExcluding already handles partial windows at the series edges,
+// so seeding a bit under that is fine) -- a live-replay case that opened
+// with zero days visible would have nothing on the chart to even orient to.
+const LIVE_REPLAY_SEED_DAYS = 14;
 import { scoreAnomalyHunt, TIME_LIMIT_SECONDS, MAX_FLAGS_PER_CASE } from '../../engine/scoring.js';
 import { runAllDetectors } from '../../engine/detectors.js';
 import { useFlagging } from '../../engine/useFlagging.js';
@@ -17,7 +25,7 @@ import { requestConfirm } from '../../engine/confirmBus.js';
 import heroPhoto from '../../assets/photos/anomaly-satellite.jpg';
 import styles from './styles.module.css';
 
-export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = null }) {
+export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = null, practiceType = null }) {
   const [caseIndex, setCaseIndex] = useState(0);
   const [currentCase, setCurrentCase] = useState(null);
   const [usedTemplateIds, setUsedTemplateIds] = useState([]);
@@ -27,6 +35,8 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
   const [caseResults, setCaseResults] = useState([]);
   const [finished, setFinished] = useState(false);
   const [started, setStarted] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const [revealedCount, setRevealedCount] = useState(LIVE_REPLAY_SEED_DAYS);
 
   const { flags, yGuessMap, placeFlag, removeFlag, resetFlags } = useFlagging();
   const timer = useCountdownTimer(TIME_LIMIT_SECONDS, () => {
@@ -49,7 +59,7 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
     const difficulty = DIFFICULTY_SEQUENCE[idx % DIFFICULTY_SEQUENCE.length];
     const newCase = importedSeries
       ? generateCaseFromSeries(importedSeries, importedMeta?.unit, difficulty, importedMeta?.title)
-      : generateAnomalyCase(difficulty, usedTemplateIds);
+      : generateAnomalyCase(difficulty, usedTemplateIds, null, practiceType);
     setUsedTemplateIds((prev) => [...prev, newCase.templateId]);
     setCurrentCase(newCase);
     resetFlags();
@@ -58,9 +68,17 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
     setResult(null);
     setDetectorData(null);
     setStarted(false);
+    setLiveMode(false);
+    setRevealedCount(LIVE_REPLAY_SEED_DAYS);
   }
 
   function beginCase() {
+    setStarted(true);
+    timer.start();
+  }
+
+  function beginLiveCase() {
+    setLiveMode(true);
     setStarted(true);
     timer.start();
   }
@@ -142,7 +160,11 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
 
   return (
     <PageShell
-      eyebrow={`Anomaly Hunt — Case ${caseIndex + 1} of ${totalCases}`}
+      eyebrow={
+        practiceType
+          ? `Anomaly Hunt — Practice: ${ANOMALY_TYPE_SHORT_LABELS[practiceType]} — Case ${caseIndex + 1} of ${totalCases}`
+          : `Anomaly Hunt — Case ${caseIndex + 1} of ${totalCases}`
+      }
       title={revealed ? 'Case review' : 'Find what broke.'}
       photo={{
         src: heroPhoto,
@@ -160,9 +182,11 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
 
       {!started && (
         <ReadyGate
-          detail={`You'll have ${TIME_LIMIT_SECONDS} seconds once the clock starts. Read the brief above, then start when you're ready.`}
+          detail={`You'll have ${TIME_LIMIT_SECONDS} seconds once the clock starts. Read the brief above, then start when you're ready. "Start live replay" reveals the case one day at a time instead of all at once, for practicing real-time judgement.`}
           buttonLabel="Start case"
           onStart={beginCase}
+          secondaryLabel="Start live replay"
+          onSecondaryStart={beginLiveCase}
         />
       )}
 
@@ -179,6 +203,8 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
               groundTruth={currentCase.groundTruth}
               revealed={revealed}
               detectorFlags={detectorData?.combinedFlags}
+              rollingBandStats={detectorData?.statsByDetector?.rolling_zscore}
+              visibleCount={liveMode && !revealed ? revealedCount : null}
               disabled={revealed}
             />
           </div>
@@ -186,9 +212,18 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
           {!revealed && (
             <div className={styles.controls}>
               <p className={styles.hint}>
+                {liveMode && `Day ${revealedCount} of ${currentCase.series.length} revealed. `}
                 Click or drag-throw onto the chart to flag a point (or focus the chart and use arrow keys + Enter). Up to {MAX_FLAGS_PER_CASE} flags.
               </p>
-              <Button variant="primary" onClick={handleReveal}>Lock in</Button>
+              {liveMode && revealedCount < currentCase.series.length ? (
+                <Button variant="primary" onClick={() => setRevealedCount((c) => Math.min(c + 1, currentCase.series.length))}>
+                  Next day →
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={handleReveal}>
+                  {liveMode ? 'Reached today — lock in' : 'Lock in'}
+                </Button>
+              )}
             </div>
           )}
         </>
@@ -198,6 +233,7 @@ export function AnomalyHunt({ onNavigate, importedSeries = null, importedMeta = 
         <CaseRevealPanel
           result={result}
           detectorData={detectorData}
+          series={currentCase.series}
           footer={
             <Button variant="primary" onClick={handleNext}>
               {caseIndex + 1 >= totalCases ? 'Finish' : 'Next case →'}

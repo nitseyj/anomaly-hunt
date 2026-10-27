@@ -25,8 +25,12 @@ function rankIndexForScore(totalScore) {
 
 export function getProfile() {
   const entries = getHistory();
-  const huntEntries = entries.filter((e) => e.mode === 'anomaly_hunt' || e.mode === 'daily_challenge');
+  // Survival rounds count toward the same skill radar and hunt accuracy
+  // as regular Anomaly Hunt/Daily Challenge -- it's the same underlying
+  // skill being exercised, not a walled-off side mode.
+  const huntEntries = entries.filter((e) => e.mode === 'anomaly_hunt' || e.mode === 'daily_challenge' || e.mode === 'survival');
   const forecastEntries = entries.filter((e) => e.mode === 'forecast_call');
+  const survivalEntries = entries.filter((e) => e.mode === 'survival');
 
   const totalScore = entries.reduce((sum, e) => sum + (e.points || 0), 0);
   const casesPlayed = huntEntries.length;
@@ -51,6 +55,10 @@ export function getProfile() {
   }
 
   const dailyStreak = computeDailyStreak(entries.filter((e) => e.mode === 'daily_challenge'));
+  // The highest wave number ever reached across every run, including the
+  // wave that ended a run -- "got to wave N" is the usual survival-game
+  // convention, not "cleared N waves".
+  const bestSurvivalWave = survivalEntries.reduce((max, e) => Math.max(max, e.wave || 0), 0);
 
   const rankIndex = rankIndexForScore(totalScore);
   const currentRank = RANKS[rankIndex];
@@ -70,13 +78,33 @@ export function getProfile() {
     forecastAccuracy,
     bestForecastStreak: bestStreak,
     dailyStreak,
+    bestSurvivalWave,
     skills: {
       pointSpike: skillFor(huntEntries, 'point_spike'),
       levelShift: skillFor(huntEntries, 'level_shift'),
       missingGap: skillFor(huntEntries, 'missing_gap'),
       trendBreak: skillFor(huntEntries, 'trend_break'),
+      volatilitySpike: skillFor(huntEntries, 'volatility_spike'),
     },
   };
+}
+
+const SKILL_TO_ANOMALY_TYPE = {
+  pointSpike: 'point_spike',
+  levelShift: 'level_shift',
+  missingGap: 'missing_gap',
+  trendBreak: 'trend_break',
+  volatilitySpike: 'volatility_spike',
+};
+
+/** The anomaly type (snake_case, matching ANOMALY_TYPES) the player has
+ * the lowest hit ratio on, for a "practice your weakest skill" CTA.
+ * Returns null when there's no history to judge yet (every skill null). */
+export function weakestSkillType(profile) {
+  const scored = Object.entries(profile.skills).filter(([, ratio]) => ratio !== null);
+  if (scored.length === 0) return null;
+  const [weakestKey] = scored.reduce((min, entry) => (entry[1] < min[1] ? entry : min));
+  return SKILL_TO_ANOMALY_TYPE[weakestKey];
 }
 
 function skillFor(huntEntries, type) {

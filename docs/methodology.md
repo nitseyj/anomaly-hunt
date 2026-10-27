@@ -6,7 +6,7 @@ not a black box.
 
 ## Anomaly types
 
-Four anomaly types are injected (`web/src/engine/anomalies.js`), chosen
+Five anomaly types are injected (`web/src/engine/anomalies.js`), chosen
 because they mirror what a BI analyst actually encounters in real
 business data:
 
@@ -16,6 +16,13 @@ business data:
 | **Level shift** | The series steps to a new baseline and stays there | A pricing change, a new marketing channel going live |
 | **Missing gap** | A stretch of flat/stuck values | A tracking pixel or sensor going down |
 | **Trend break** | The slope of the series changes abruptly | A product going viral, a market shock |
+| **Volatility spike** | A short burst of erratic, noisy swings around the *same* baseline | A flaky sensor, bot-contaminated traffic, a chaotic stretch before a system stabilizes |
+
+Volatility spike is the odd one out in that table: every other type
+changes the series' *level* (mean) in some way — a volatility spike
+doesn't. It's purely a change in *variance*, which is also what makes it
+a useful teaching contrast — see "Why the detectors sometimes disagree"
+below.
 
 Ground truth is recorded as a single index (the moment the anomaly
 starts), not a range — see "Scoring definition" below for why.
@@ -76,6 +83,15 @@ window has adjusted and stops flagging anything). The seasonal-aware
 method tends to catch shifts more completely in seasonal data. Seeing
 detectors disagree — and reasoning about *why* — is closer to real
 analytical work than any single "correct" answer would be.
+
+A volatility spike shows a different flavor of the same lesson: because
+every rolling method excludes the point under test from its own baseline
+window, points in the *middle* of a volatility burst can end up compared
+against a window that's itself gone noisy (it now includes several other
+burst points), which can under-flag them even though the burst's onset
+was an obvious, real deviation. The detector isn't wrong exactly — it's
+answering "is this point unusual relative to its recent neighbors," and
+mid-burst, its neighbors are unusual too.
 
 ## Detector evaluation: event-based recall
 

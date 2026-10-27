@@ -12,7 +12,7 @@ import { Button } from './Button.jsx';
 import { CornerBrackets } from './CornerBrackets.jsx';
 import styles from './ReadyGate.module.css';
 
-export function ReadyGate({ detail, buttonLabel = 'Start', onStart }) {
+export function ReadyGate({ detail, buttonLabel = 'Start', onStart, secondaryLabel = null, onSecondaryStart = null }) {
   return (
     <motion.div
       className={styles.wrap}
@@ -24,9 +24,16 @@ export function ReadyGate({ detail, buttonLabel = 'Start', onStart }) {
       <CornerBrackets />
       <span className={styles.pulse} />
       <p className={styles.detail}>{detail}</p>
-      <Button variant="primary" size="lg" onClick={onStart}>
-        {buttonLabel}
-      </Button>
+      <div className={styles.buttonRow}>
+        <Button variant="primary" size="lg" onClick={onStart}>
+          {buttonLabel}
+        </Button>
+        {secondaryLabel && onSecondaryStart && (
+          <Button variant="ghost" size="lg" onClick={onSecondaryStart}>
+            {secondaryLabel}
+          </Button>
+        )}
+      </div>
     </motion.div>
   );
 }

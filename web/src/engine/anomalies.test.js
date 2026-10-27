@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { injectAnomalies, stdDev, ANOMALY_TYPES } from './anomalies.js';
+import { injectAnomalies, stdDev, ANOMALY_TYPES, survivalSettingsForWave } from './anomalies.js';
 import { createRng } from './rng.js';
 import { CREDIT_RADIUS } from './scoring.js';
 
@@ -115,11 +115,54 @@ describe('injectAnomalies', () => {
     }
   );
 
+  it(
+    'a volatility_spike anomaly is visibly off AT its own index, not left to a random draw ' +
+      'that could land near zero by chance',
+    () => {
+      for (let seed = 0; seed < 40; seed++) {
+        const clean = cleanBaseline();
+        const rng = createRng(seed);
+        const { values, groundTruth } = injectAnomalies(clean, 'easy', rng);
+        const spike = groundTruth.find((a) => a.type === 'volatility_spike');
+        if (!spike) continue;
+        const deviationAtIdx = Math.abs(values[spike.index] - clean[spike.index]);
+        expect(deviationAtIdx).toBeGreaterThan(0.01);
+        return;
+      }
+      throw new Error('no volatility_spike drawn in 40 seeds');
+    }
+  );
+
+  it('a volatility_spike anomaly shows elevated variance across its burst window vs. the clean baseline', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const clean = cleanBaseline();
+      const rng = createRng(seed);
+      const { values, groundTruth } = injectAnomalies(clean, 'hard', rng);
+      const spike = groundTruth.find((a) => a.type === 'volatility_spike');
+      if (!spike) continue;
+      const window = 4;
+      const burstSlice = values.slice(spike.index, spike.index + window);
+      const cleanSlice = clean.slice(spike.index, spike.index + window);
+      expect(stdDev(burstSlice)).toBeGreaterThan(stdDev(cleanSlice));
+      return;
+    }
+    throw new Error('no volatility_spike drawn in 40 seeds');
+  });
+
   it('falls back to the range-based magnitude floor on an almost-flat series instead of injecting a vanishing anomaly', () => {
     const almostFlat = Array(90).fill(100);
     expect(stdDev(almostFlat)).toBe(0);
     const rng = createRng(8);
-    const { values, groundTruth } = injectAnomalies(almostFlat, 'easy', rng, 0);
+    // forcedType pins this to point_spike specifically -- the floor
+    // mechanism under test (rangeFloor / the range-based fallback) is
+    // shared by every type via `magnitude`, so testing it through one
+    // type that actually applies `magnitude` directly at its own index is
+    // enough. missing_gap is NOT a valid type to leave to chance here:
+    // freezing an already-flat series to its own preceding value is a
+    // true no-op, zero deviation by construction -- that's correct
+    // missing_gap behavior on this degenerate fixture, not a floor-bypass
+    // bug, so the type must be pinned rather than left to the RNG draw.
+    const { values, groundTruth } = injectAnomalies(almostFlat, 'easy', rng, 0, 'point_spike');
     const idx = groundTruth[0].index;
     const deviation = Math.abs(values[idx] - almostFlat[idx]);
     // easy's rangeFloor is 0.3 of the series' own value range; on a flat
@@ -145,5 +188,42 @@ describe('injectAnomalies', () => {
     const b = injectAnomalies(clean, 'medium', createRng(555));
     expect(a.values).toEqual(b.values);
     expect(a.groundTruth).toEqual(b.groundTruth);
+  });
+
+  it('forcedType makes every injected anomaly that type, for practice mode', () => {
+    for (let seed = 0; seed < 10; seed++) {
+      const rng = createRng(seed * 13 + 1);
+      const { groundTruth } = injectAnomalies(cleanBaseline(), 'hard', rng, null, 'trend_break');
+      expect(groundTruth.length).toBeGreaterThan(0);
+      expect(groundTruth.every((a) => a.type === 'trend_break')).toBe(true);
+    }
+  });
+
+  it('accepts a settings object directly (survival mode) with the same shape as a named tier', () => {
+    const rng = createRng(21);
+    const customSettings = { count: 2, magnitudeMult: 2.0, rangeFloor: 0.2, gapLenRange: [4, 6] };
+    const { groundTruth } = injectAnomalies(cleanBaseline(), customSettings, rng);
+    expect(groundTruth).toHaveLength(2);
+  });
+});
+
+describe('survivalSettingsForWave', () => {
+  it('escalates count/magnitude/rangeFloor as the wave number rises', () => {
+    const wave1 = survivalSettingsForWave(1);
+    const wave20 = survivalSettingsForWave(20);
+    expect(wave1.count).toBeLessThanOrEqual(wave20.count);
+    expect(wave20.magnitudeMult).toBeLessThan(wave1.magnitudeMult);
+    expect(wave20.rangeFloor).toBeLessThan(wave1.rangeFloor);
+  });
+
+  it('holds at a steady ceiling past wave 13 instead of escalating forever', () => {
+    const wave13 = survivalSettingsForWave(13);
+    const wave100 = survivalSettingsForWave(100);
+    expect(wave100.magnitudeMult).toBeCloseTo(wave13.magnitudeMult);
+    expect(wave100.rangeFloor).toBeCloseTo(wave13.rangeFloor);
+  });
+
+  it('caps anomaly count at 4 so a run never exceeds MAX_FLAGS_PER_CASE headroom', () => {
+    expect(survivalSettingsForWave(200).count).toBe(4);
   });
 });

@@ -5,15 +5,25 @@ describe('rollingZScoreDetect', () => {
   it('flags an obvious spike against a flat baseline', () => {
     const values = Array(40).fill(100);
     values[20] = 400;
-    const flags = rollingZScoreDetect(values);
+    const { flags } = rollingZScoreDetect(values);
     expect(flags[20]).toBe(true);
     expect(flags.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('returns the rolling mean/std/z-score behind each flag, not just the verdict', () => {
+    const values = Array(40).fill(100);
+    values[20] = 400;
+    const { flags, stats } = rollingZScoreDetect(values);
+    expect(stats).toHaveLength(values.length);
+    expect(stats[20].mean).toBeCloseTo(100, 0);
+    expect(Math.abs(stats[20].z)).toBeGreaterThan(3);
+    expect(flags[20]).toBe(true);
   });
 
   it("does not flag a series with no anomalies", () => {
     // Gentle, deterministic wave -- no point should read as a 3-sigma outlier.
     const values = Array.from({ length: 60 }, (_, i) => 100 + Math.sin(i / 4) * 3);
-    const flags = rollingZScoreDetect(values);
+    const { flags } = rollingZScoreDetect(values);
     expect(flags.every((f) => f === false)).toBe(true);
   });
 
@@ -44,7 +54,7 @@ describe('rollingZScoreDetect', () => {
       values[15] = 100;
       values[10] = 117;
 
-      const flags = rollingZScoreDetect(values, 10, 3.0);
+      const { flags } = rollingZScoreDetect(values, 10, 3.0);
       expect(flags[10]).toBe(true);
     }
   );
@@ -53,7 +63,7 @@ describe('rollingZScoreDetect', () => {
     const values = Array(30).fill(50);
     expect(() => rollingZScoreDetect(values)).not.toThrow();
     // A flat series' only "deviation" source is float noise; nothing should trip a 3-sigma threshold.
-    expect(rollingZScoreDetect(values).every((f) => f === false)).toBe(true);
+    expect(rollingZScoreDetect(values).flags.every((f) => f === false)).toBe(true);
   });
 });
 
@@ -61,14 +71,23 @@ describe('rollingIqrDetect', () => {
   it('flags a clear spike outside the interquartile fence', () => {
     const values = Array.from({ length: 50 }, (_, i) => 100 + (i % 2 === 0 ? 1 : -1));
     values[25] = 500;
-    const flags = rollingIqrDetect(values);
+    const { flags } = rollingIqrDetect(values);
     expect(flags[25]).toBe(true);
   });
 
   it('does not flag ordinary points inside a quiet series', () => {
     const values = Array.from({ length: 50 }, (_, i) => 100 + (i % 2 === 0 ? 1 : -1));
-    const flags = rollingIqrDetect(values);
+    const { flags } = rollingIqrDetect(values);
     expect(flags.filter(Boolean)).toHaveLength(0);
+  });
+
+  it('returns the q1/q3/iqr/bounds behind each flag', () => {
+    const values = Array.from({ length: 50 }, (_, i) => 100 + (i % 2 === 0 ? 1 : -1));
+    values[25] = 500;
+    const { stats } = rollingIqrDetect(values);
+    expect(stats).toHaveLength(values.length);
+    expect(stats[25].iqr).toBeCloseTo(stats[25].q3 - stats[25].q1);
+    expect(values[25]).toBeGreaterThan(stats[25].upperBound);
   });
 });
 
@@ -79,14 +98,15 @@ describe('weeklySeasonalDiffDetect', () => {
     const pattern = [100, 110, 105, 108, 112, 90, 95];
     const values = Array.from({ length: 35 }, (_, i) => pattern[i % 7]);
     values[21] = 300; // same weekday as index 0/7/14, way off from them
-    const flags = weeklySeasonalDiffDetect(values);
+    const { flags } = weeklySeasonalDiffDetect(values);
     expect(flags[21]).toBe(true);
   });
 
   it('returns false for the first 7 points (no prior week to diff against)', () => {
     const values = Array.from({ length: 20 }, () => 100);
-    const flags = weeklySeasonalDiffDetect(values);
+    const { flags, stats } = weeklySeasonalDiffDetect(values);
     expect(flags.slice(0, 7).every((f) => f === false)).toBe(true);
+    expect(stats.slice(0, 7).every((s) => s === null)).toBe(true);
   });
 });
 

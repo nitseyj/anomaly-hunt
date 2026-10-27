@@ -8,7 +8,7 @@
  */
 import { createRng, randomSeed } from './rng.js';
 import { pickTemplate, clampToUnit, movingAverage, SERIES_LENGTH } from './metrics.js';
-import { injectAnomalies, stdDev } from './anomalies.js';
+import { injectAnomalies, stdDev, survivalSettingsForWave } from './anomalies.js';
 
 const round2 = (v) => Math.round(v * 100) / 100;
 
@@ -16,12 +16,12 @@ function caseId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function generateAnomalyCase(difficulty, usedTemplateIds = [], seed = null) {
+export function generateAnomalyCase(difficulty, usedTemplateIds = [], seed = null, forcedType = null) {
   const rng = createRng(seed ?? randomSeed());
   const { template, scenario } = pickTemplate(rng, usedTemplateIds);
   const { dates, values: rawValues } = template.generate(rng, SERIES_LENGTH);
   const cleanValues = movingAverage(rawValues, 3);
-  const { values: injected, groundTruth } = injectAnomalies(cleanValues, difficulty, rng, stdDev(rawValues));
+  const { values: injected, groundTruth } = injectAnomalies(cleanValues, difficulty, rng, stdDev(rawValues), forcedType);
   const clamped = clampToUnit(injected, template.unit);
 
   return {
@@ -32,6 +32,33 @@ export function generateAnomalyCase(difficulty, usedTemplateIds = [], seed = nul
     label: template.label,
     unit: template.unit,
     difficulty,
+    series: dates.map((date, i) => ({ date, value: round2(clamped[i]) })),
+    groundTruth,
+  };
+}
+
+/** Survival mode: same pipeline as generateAnomalyCase(), but difficulty
+ * comes from a continuous per-wave ramp (survivalSettingsForWave())
+ * instead of a named tier, since the named tiers top out at 'hard' with
+ * nowhere further to escalate for an endless mode. */
+export function generateSurvivalCase(wave, usedTemplateIds = []) {
+  const rng = createRng(randomSeed());
+  const { template, scenario } = pickTemplate(rng, usedTemplateIds);
+  const { dates, values: rawValues } = template.generate(rng, SERIES_LENGTH);
+  const cleanValues = movingAverage(rawValues, 3);
+  const settings = survivalSettingsForWave(wave);
+  const { values: injected, groundTruth } = injectAnomalies(cleanValues, settings, rng, stdDev(rawValues));
+  const clamped = clampToUnit(injected, template.unit);
+
+  return {
+    id: caseId(),
+    templateId: template.id,
+    title: scenario.title,
+    brief: scenario.brief,
+    label: template.label,
+    unit: template.unit,
+    difficulty: `Wave ${wave}`,
+    wave,
     series: dates.map((date, i) => ({ date, value: round2(clamped[i]) })),
     groundTruth,
   };

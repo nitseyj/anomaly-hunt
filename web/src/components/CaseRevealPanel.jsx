@@ -16,10 +16,12 @@ import { DataTable } from './DataTable.jsx';
 import { ResultBreakdown } from './ResultBreakdown.jsx';
 import { StampBadge } from './StampBadge.jsx';
 import { Confetti } from './Confetti.jsx';
+import { InfoHint } from './InfoHint.jsx';
 import { DETECTOR_META, evaluateHumanResult } from '../engine/detectors.js';
+import { ANOMALY_TYPE_LABELS } from '../engine/anomalies.js';
 import styles from './CaseRevealPanel.module.css';
 
-export function CaseRevealPanel({ result, detectorData, children, footer }) {
+export function CaseRevealPanel({ result, detectorData, series, children, footer }) {
   const stampText = result.anomaliesMissed === 0 && result.falseAlarms === 0 ? 'Clean Sweep' : result.points >= 60 ? 'Case Closed' : 'Needs Review';
   const stampTone = result.points >= 60 ? 'signal' : 'warn';
 
@@ -29,6 +31,12 @@ export function CaseRevealPanel({ result, detectorData, children, footer }) {
         ...Object.entries(detectorData.scores).map(([key, s]) => ({ key, method: DETECTOR_META[key].label, ...s })),
       ]
     : [];
+
+  // Naming the SHAPE of a missed anomaly (not just marking it wrong) is
+  // what lets a player build a mental taxonomy of what to look for next
+  // time -- `series` is optional so this section just doesn't render for
+  // any caller that hasn't been updated to pass it.
+  const missed = series ? result.hits.filter((h) => h.matchedIndex === null) : [];
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={styles.reveal}>
@@ -52,7 +60,16 @@ export function CaseRevealPanel({ result, detectorData, children, footer }) {
             <DataTable
               highlightRowIndex={0}
               columns={[
-                { key: 'method', label: 'Method' },
+                {
+                  key: 'method',
+                  label: 'Method',
+                  render: (r) => (
+                    <span className={styles.methodCell}>
+                      {r.method}
+                      {DETECTOR_META[r.key]?.description && <InfoHint text={DETECTOR_META[r.key].description} />}
+                    </span>
+                  ),
+                },
                 { key: 'precision', label: 'Precision', render: (r) => r.precision.toFixed(2) },
                 { key: 'recall', label: 'Recall', render: (r) => r.recall.toFixed(2) },
                 { key: 'f1', label: 'F1', render: (r) => r.f1.toFixed(2) },
@@ -62,6 +79,20 @@ export function CaseRevealPanel({ result, detectorData, children, footer }) {
           </div>
         )}
       </div>
+
+      {missed.length > 0 && (
+        <div className={styles.missedWrap}>
+          <h4 className={styles.missedTitle}>What you missed</h4>
+          <ul className={styles.missedList}>
+            {missed.map((h) => (
+              <li key={h.anomalyIndex} className={styles.missedItem}>
+                <span className={styles.missedDate}>{series[h.anomalyIndex]?.date}</span>
+                <span>— {ANOMALY_TYPE_LABELS[h.type] ?? h.type}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {children}
 

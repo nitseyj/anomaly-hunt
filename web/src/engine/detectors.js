@@ -34,22 +34,39 @@ function windowExcluding(values, i, window) {
   return out;
 }
 
+/**
+ * Each rolling detector returns `{ flags, stats }` -- `stats[i]` is the
+ * exact intermediate math (rolling mean/std, quantile fence, etc.) that
+ * produced `flags[i]`, kept instead of discarded so the reveal screen
+ * can show a player *why* a detector flagged (or didn't flag) a point,
+ * not just the verdict.
+ */
 export function rollingZScoreDetect(values, window = 10, threshold = 3.0) {
-  return values.map((v, i) => {
+  const stats = [];
+  const flags = values.map((v, i) => {
     const w = windowExcluding(values, i, window);
+    const m = mean(w);
     const s = std(w) || 1e-9;
-    return Math.abs((v - mean(w)) / s) > threshold;
+    const z = (v - m) / s;
+    stats.push({ mean: m, std: s, z });
+    return Math.abs(z) > threshold;
   });
+  return { flags, stats };
 }
 
 export function rollingIqrDetect(values, window = 20, k = 1.5) {
-  return values.map((v, i) => {
+  const stats = [];
+  const flags = values.map((v, i) => {
     const sorted = windowExcluding(values, i, window).sort((a, b) => a - b);
     const q1 = quantile(sorted, 0.25);
     const q3 = quantile(sorted, 0.75);
     const iqr = q3 - q1;
-    return v < q1 - k * iqr || v > q3 + k * iqr;
+    const lowerBound = q1 - k * iqr;
+    const upperBound = q3 + k * iqr;
+    stats.push({ q1, q3, iqr, lowerBound, upperBound });
+    return v < lowerBound || v > upperBound;
   });
+  return { flags, stats };
 }
 
 /** Compares each point to the same weekday ~7 days prior, then z-scores that difference. */
@@ -58,7 +75,9 @@ export function weeklySeasonalDiffDetect(values, threshold = 2.5) {
   const validDiffs = diffs.filter((d) => d !== null);
   const m = mean(validDiffs);
   const s = std(validDiffs) || 1e-9;
-  return diffs.map((d) => (d === null ? false : Math.abs((d - m) / s) > threshold));
+  const stats = diffs.map((d) => (d === null ? null : { diff: d, mean: m, std: s, z: (d - m) / s }));
+  const flags = stats.map((st) => (st === null ? false : Math.abs(st.z) > threshold));
+  return { flags, stats };
 }
 
 /**
@@ -95,16 +114,34 @@ export function evaluateFlags(flags, groundTruthAnomalies, tolerance = 3) {
 }
 
 export const DETECTOR_META = {
-  rolling_zscore: { label: 'Rolling Z-Score' },
-  rolling_iqr: { label: 'Rolling IQR' },
-  weekly_seasonal_diff: { label: 'Seasonal Diff' },
+  rolling_zscore: {
+    label: 'Rolling Z-Score',
+    description: 'Flags points more than 3 standard deviations from a rolling local mean. Fast and simple, but can mistake a normal seasonal peak for an outlier.',
+  },
+  rolling_iqr: {
+    label: 'Rolling IQR',
+    description: "Flags points outside 1.5x a rolling window's interquartile range. More robust to a few extreme values than z-score, but shares the same seasonality blind spot.",
+  },
+  weekly_seasonal_diff: {
+    label: 'Seasonal Diff',
+    description: 'Compares each point to the same weekday ~7 days earlier, then z-scores that difference -- a lightweight stand-in for proper seasonal decomposition.',
+  },
 };
 
 export function runAllDetectors(values, groundTruthAnomalies) {
+  const zscore = rollingZScoreDetect(values);
+  const iqr = rollingIqrDetect(values);
+  const seasonal = weeklySeasonalDiffDetect(values);
+
   const flagsByDetector = {
-    rolling_zscore: rollingZScoreDetect(values),
-    rolling_iqr: rollingIqrDetect(values),
-    weekly_seasonal_diff: weeklySeasonalDiffDetect(values),
+    rolling_zscore: zscore.flags,
+    rolling_iqr: iqr.flags,
+    weekly_seasonal_diff: seasonal.flags,
+  };
+  const statsByDetector = {
+    rolling_zscore: zscore.stats,
+    rolling_iqr: iqr.stats,
+    weekly_seasonal_diff: seasonal.stats,
   };
   const scores = {};
   for (const [name, flags] of Object.entries(flagsByDetector)) {
@@ -115,7 +152,7 @@ export function runAllDetectors(values, groundTruthAnomalies) {
     const votes = Object.values(flagsByDetector).filter((flags) => flags[i]).length;
     return votes >= 2;
   });
-  return { scores, flagsByDetector, combinedFlags };
+  return { scores, flagsByDetector, statsByDetector, combinedFlags };
 }
 
 /**

@@ -178,6 +178,7 @@ export function DailyChallenge({ onNavigate }) {
               groundTruth={challenge.groundTruth}
               revealed={revealed}
               detectorFlags={detectorData?.combinedFlags}
+              rollingBandStats={detectorData?.statsByDetector?.rolling_zscore}
               disabled={revealed}
             />
           </div>
@@ -197,6 +198,7 @@ export function DailyChallenge({ onNavigate }) {
         <CaseRevealPanel
           result={result}
           detectorData={detectorData}
+          series={challenge.series}
           footer={<Button variant="primary" onClick={() => onNavigate('home', { skipGuard: true })}>Back to home</Button>}
         >
           <NextCaseCountdown />

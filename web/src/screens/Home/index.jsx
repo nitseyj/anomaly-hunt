@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { PageShell } from '../../components/PageShell.jsx';
-import { IconBadge, AnomalyIcon, ForecastIcon, DailyIcon } from '../../components/ModeIcon.jsx';
+import { IconBadge, AnomalyIcon, ForecastIcon, DailyIcon, SurvivalIcon } from '../../components/ModeIcon.jsx';
 import { Pill } from '../../components/Pill.jsx';
 import { getTodayResult } from '../../engine/daily.js';
 import { getHistory } from '../../engine/history.js';
@@ -32,9 +32,17 @@ const MODES = [
     tagline: 'One shared case per day',
     body: "Today's case is the same for everyone — seeded by the calendar date itself. One attempt per local day.",
   },
+  {
+    id: 'survival',
+    index: '004',
+    Icon: SurvivalIcon,
+    title: 'Survival',
+    tagline: 'Endless · escalating difficulty',
+    body: 'Keep spotting anomalies as the pace quickens and the noise grows. One miss ends the run — chase your best wave.',
+  },
 ];
 
-const MODE_LABELS = { anomaly_hunt: 'Anomaly Hunt', forecast_call: 'Forecast Call', daily_challenge: 'Daily Challenge' };
+const MODE_LABELS = { anomaly_hunt: 'Anomaly Hunt', forecast_call: 'Forecast Call', daily_challenge: 'Daily Challenge', survival: 'Survival' };
 
 export function Home({ onNavigate }) {
   const dailyDone = Boolean(getTodayResult());
@@ -43,7 +51,7 @@ export function Home({ onNavigate }) {
   return (
     <PageShell
       eyebrow="Anomaly Hunt — Field Investigations Unit"
-      title="Three ways to practice reading data like an analyst."
+      title="Four ways to practice reading data like an analyst."
       subtitle="Every case is procedurally generated in the browser. No two playthroughs look the same, and no server ever sees your data."
       photo={{
         src: heroPhoto,
